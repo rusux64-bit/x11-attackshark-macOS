@@ -6,7 +6,7 @@ import IOKit.hid
 public final class DeviceViewModel: ObservableObject {
     @Published public var isConnected: Bool = false
     @Published public var deviceName: String = "No device connected"
-    @Published public var batteryLevel: Int = 65
+    @Published public var batteryLevel: Int = 69
     @Published public var isCharging: Bool = false
     @Published public var isWiredConnection: Bool = false
 
@@ -81,8 +81,7 @@ public final class DeviceViewModel: ObservableObject {
             payload.removeFirst()
         }
 
-        // Search for battery event (0x40) preceded by device model identifier (0x55 or 0x02)
-        // Expected payload format: [0x55, 0x40, <statusFlag>, <batteryLevel>]
+        // Expected report: [0x55, 0x40, <statusFlag>, <batteryLevel>]
         if let idx = payload.firstIndex(of: ProtocolConstants.evBattery), idx > 0, payload.count > idx + 2 {
             let model = payload[idx - 1]
             if model == 0x55 || model == 0x02 {

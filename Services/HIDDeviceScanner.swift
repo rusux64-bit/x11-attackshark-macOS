@@ -23,7 +23,7 @@ private class EndpointContext {
 public final class HIDDeviceScanner {
     
     private var hidManager: IOHIDManager?
-    private var endpointContexts: [IOHIDDevice: EndpointContext] = [:]
+    private var activeContexts: [EndpointContext] = []
     
     // Callbacks to notify ViewModel
     public var onDeviceConnected: ((String, IOHIDDevice) -> Void)?
@@ -65,10 +65,10 @@ public final class HIDDeviceScanner {
             scanner.detachDevice(device)
         }, selfPointer)
         
-        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue as CFString)
+        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue as CFString)
         IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         
-        // Also attach any matching devices already plugged in
+        // Also attach any devices already connected
         if let existingDevices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> {
             for dev in existingDevices {
                 attachDevice(dev)
@@ -79,7 +79,10 @@ public final class HIDDeviceScanner {
     }
     
     private func attachDevice(_ device: IOHIDDevice) {
-        guard endpointContexts[device] == nil else { return }
+        // Prevent duplicate registration for the exact same device pointer
+        if activeContexts.contains(where: { $0.device == device }) {
+            return
+        }
         
         let productName = getProperty(device, key: kIOHIDProductKey) as? String ?? "ATTACK SHARK X11 Mouse"
         let maxFeature = (getProperty(device, key: "MaxFeatureReportSize") as? Int) ?? 0
@@ -87,7 +90,7 @@ public final class HIDDeviceScanner {
         print("🟢 Connected endpoint: \(productName) (Feature: \(maxFeature), Input: \(maxInput))")
         
         let context = EndpointContext(scanner: self, device: device)
-        endpointContexts[device] = context
+        activeContexts.append(context)
         let contextPtr = Unmanaged.passUnretained(context).toOpaque()
         
         IOHIDDeviceRegisterInputReportCallback(
@@ -103,8 +106,6 @@ public final class HIDDeviceScanner {
             contextPtr
         )
         
-        IOHIDDeviceScheduleWithRunLoop(device, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue as CFString)
-        
         DispatchQueue.main.async {
             self.onDeviceConnected?(productName, device)
         }
@@ -117,10 +118,10 @@ public final class HIDDeviceScanner {
     }
     
     private func detachDevice(_ device: IOHIDDevice) {
-        endpointContexts.removeValue(forKey: device)
-        print("🔴 Disconnected endpoint. Remaining: \(endpointContexts.count)")
+        activeContexts.removeAll(where: { $0.device == device })
+        print("🔴 Disconnected endpoint. Remaining: \(activeContexts.count)")
         
-        if endpointContexts.isEmpty {
+        if activeContexts.isEmpty {
             DispatchQueue.main.async {
                 self.onDeviceDisconnected?()
             }
@@ -134,7 +135,7 @@ public final class HIDDeviceScanner {
     
     deinit {
         if let manager = hidManager {
-            IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue as CFString)
+            IOHIDManagerUnscheduleFromRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue as CFString)
             IOHIDManagerClose(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         }
     }
