@@ -41,27 +41,22 @@ public struct MouseDashboardView: View {
                 .background(batteryColor(for: viewModel.batteryLevel).opacity(0.15))
                 .cornerRadius(8)
                 
-                // În interiorul HStack-ului de sus, înlocuiește butonul existent cu acesta:
+                // Boton cu hitbox (range) mult mai mare
                 Button(action: {
-                    withAnimation(.easeInOut(duration: 0.4)) {
+                    withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
                         isDarkMode.toggle()
                     }
                 }) {
                     Image(systemName: isDarkMode ? "sun.max.fill" : "moon.fill")
                         .foregroundColor(isDarkMode ? .yellow : .blue)
                         .font(.system(size: 16))
-                        .rotationEffect(.degrees(isDarkMode ? 360 : 0))
-                        .scaleEffect(isDarkMode ? 1.0 : 1.1)
+                        .scaleEffect(isDarkMode ? 1.0 : 0.95)
+                        .transition(.scale.combined(with: .opacity))
+                        .padding(.horizontal, 14) // Mărește zona de click pe lățime
+                        .padding(.vertical, 10)   // Mărește zona de click pe înălțime
+                        .contentShape(Rectangle()) // Face toată suprafața padding-ului clicabilă
                 }
                 .buttonStyle(.plain)
-                .padding(8)
-                .background(Color.secondary.opacity(0.15))
-                .cornerRadius(8)
-
-                // La sfârșitul containerului principal (înaintea modifiers-urilor finale), asigură tranziția lină:
-                .animation(.easeInOut(duration: 0.3), value: isDarkMode)
-                .buttonStyle(.plain)
-                .padding(8)
                 .background(Color.secondary.opacity(0.15))
                 .cornerRadius(8)
             }
@@ -167,6 +162,7 @@ public struct MouseDashboardView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(isDarkMode ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))
         .preferredColorScheme(isDarkMode ? .dark : .light)
+        .animation(.easeInOut(duration: 0.5), value: isDarkMode)
     }
     
     private func batteryColor(for level: Int) -> Color {
