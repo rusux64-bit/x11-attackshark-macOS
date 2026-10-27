@@ -13,6 +13,8 @@
 		320318103090C9DB00111A9D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3203180F3090C9DB00111A9D /* ContentView.swift */; };
 		320318133090CC1700111A9D /* SharkControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318123090CC1700111A9D /* SharkControlApp.swift */; };
 		327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B993090D991008E9508 /* DeviceViewModel.swift */; };
+		327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B9D3090E300008E9508 /* MouseDashboardView.swift */; };
+		327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -26,6 +28,9 @@
 		320318113090CBEA00111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
 		320318123090CC1700111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
 		327C4B993090D991008E9508 /* DeviceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceViewModel.swift; sourceTree = "<group>"; };
+		327C4B9D3090E300008E9508 /* MouseDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseDashboardView.swift; sourceTree = "<group>"; };
+		327C4BA23090E993008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseInputMonitor.swift; sourceTree = "<group>"; };
+		327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MouseInputMonitor.swift; path = InteractiveMouse/MouseInputMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -40,6 +45,8 @@
 		000000000000000000000001 = {
 			isa = PBXGroup;
 			children = (
+				327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */,
+				327C4BA03090E96A008E9508 /* InteractiveMouse */,
 				320318113090CBEA00111A9D /* SharkControlApp.swift */,
 				320318123090CC1700111A9D /* SharkControlApp.swift */,
 				3203180A3090C7A800111A9D /* DeviceTransport.swift */,
@@ -80,6 +87,7 @@
 		320318053090C73900111A9D /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				327C4B9D3090E300008E9508 /* MouseDashboardView.swift */,
 				3203180F3090C9DB00111A9D /* ContentView.swift */,
 			);
 			path = Views;
@@ -91,6 +99,14 @@
 				327C4B993090D991008E9508 /* DeviceViewModel.swift */,
 			);
 			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		327C4BA03090E96A008E9508 /* InteractiveMouse */ = {
+			isa = PBXGroup;
+			children = (
+				327C4BA23090E993008E9508 /* MouseInputMonitor.swift */,
+			);
+			path = InteractiveMouse;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -157,12 +173,14 @@
 		000000000000000120000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */,
 				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
 				320318133090CC1700111A9D /* SharkControlApp.swift in Sources */,
 				320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */,
 				320318063090C73900111A9D /* DeviceTransport.swift in Sources */,
 				320318103090C9DB00111A9D /* ContentView.swift in Sources */,
 				320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */,
+				327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */

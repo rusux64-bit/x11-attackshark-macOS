@@ -1,68 +1,44 @@
 import SwiftUI
 
-struct ContentView: View {
+public struct ContentView: View {
     @StateObject private var viewModel = DeviceViewModel()
+    
+    public var body: some View {
+        Group {
+            if viewModel.isConnected {
+                MouseDashboardView(viewModel: viewModel)
+            } else {
+                ConnectionStatusView(viewModel: viewModel)
+            }
+        }
+        .frame(minWidth: 800, minHeight: 550)
+    }
+}
 
+private struct ConnectionStatusView: View {
+    @ObservedObject var viewModel: DeviceViewModel
+    
     var body: some View {
         VStack(spacing: 20) {
-            // Status Icon
-            Image(systemName: viewModel.isConnected ? "computermouse.fill" : "computermouse")
-                .font(.system(size: 60))
-                .foregroundColor(viewModel.isConnected ? .green : .secondary)
-                .symbolEffect(.bounce, value: viewModel.isConnected)
+            Image(systemName: "computermouse.fill")
+                .font(.system(size: 80))
+                .foregroundColor(.secondary)
+                .symbolEffect(.pulse)
             
-            // App Title
             Text("SharkControl")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             
-            // Device Status / Name
             Text(viewModel.deviceName)
                 .font(.headline)
-                .foregroundColor(viewModel.isConnected ? .primary : .secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 20)
-            
-            Divider()
-                .padding(.horizontal, 40)
-            
-            // Controls Section (Enabled only when connected)
-            VStack(spacing: 12) {
-                Text("Device Settings")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                    .foregroundColor(.secondary)
-                
-                HStack(spacing: 15) {
-                    Button(action: {
-                        print("🎛️ DPI settings requested")
-                    }) {
-                        Label("DPI Settings", systemImage: "speedometer")
-                    }
-                    .disabled(!viewModel.isConnected)
-                    
-                    Button(action: {
-                        print("🔋 Battery status requested")
-                    }) {
-                        Label("Check Battery", systemImage: "battery.100")
-                    }
-                    .disabled(!viewModel.isConnected)
-                }
-            }
-            
-            Spacer()
-            
-            // Connection hint
-            Text(viewModel.isConnected ? "Connected to ATTACK SHARK X11" : "Connect the ATTACK SHARK X11 mouse via cable or receiver to begin.")
-                .font(.footnote)
                 .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
+            
+            Text("Waiting for ATTACK SHARK X11 device...")
+                .font(.subheadline)
+                .foregroundColor(.secondary)
+                .padding(.top, 10)
         }
-        .padding(20)
-        .frame(width: 500, height: 380)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding()
     }
-}
-
-#Preview {
-    ContentView()
 }
