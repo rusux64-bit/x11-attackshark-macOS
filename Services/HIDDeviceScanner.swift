@@ -5,9 +5,11 @@ import SwiftUI
 public final class HIDDeviceScanner {
     
     private var hidManager: IOHIDManager?
-    private var activeTransport: DeviceTransport?
     
-    // ATTACK SHARK X11 Hardware Constants
+    // Callbacks to notify ViewModel
+    public var onDeviceConnected: ((String, IOHIDDevice) -> Void)?
+    public var onDeviceDisconnected: (() -> Void)?
+    
     private let targetVendorID: Int = 0x1D57
     private let cableProductID: Int = 0xFA55
     private let receiverProductID: Int = 0xFA60
@@ -22,16 +24,9 @@ public final class HIDDeviceScanner {
             return
         }
         
-        // Set multiple matching criteria strictly for the X11 mouse (Cable & Receiver)
         let matchingCriteria: [[String: Any]] = [
-            [
-                kIOHIDVendorIDKey: targetVendorID,
-                kIOHIDProductIDKey: cableProductID
-            ],
-            [
-                kIOHIDVendorIDKey: targetVendorID,
-                kIOHIDProductIDKey: receiverProductID
-            ]
+            [kIOHIDVendorIDKey: targetVendorID, kIOHIDProductIDKey: cableProductID],
+            [kIOHIDVendorIDKey: targetVendorID, kIOHIDProductIDKey: receiverProductID]
         ]
         
         IOHIDManagerSetDeviceMatchingMultiple(manager, matchingCriteria as CFArray)
@@ -49,41 +44,24 @@ public final class HIDDeviceScanner {
         }, selfPointer)
         
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetCurrent(), CFRunLoopMode.defaultMode.rawValue as CFString)
-        
-        let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeSeizeDevice))
-        if openResult == kIOReturnSuccess {
-            print("🔍 [HIDScanner] Started - listening strictly for ATTACK SHARK X11 (Cable & Receiver)...")
-        } else {
-            print("⚠️ IOHIDManager open warning: \(openResult)")
-        }
+        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeSeizeDevice))
+        print("🔍 [HIDScanner] Started scanning for ATTACK SHARK X11...")
     }
     
     private func deviceConnected(_ device: IOHIDDevice) {
-        let vendorID = getProperty(device, key: kIOHIDVendorIDKey) as? Int ?? 0
-        let productID = getProperty(device, key: kIOHIDProductIDKey) as? Int ?? 0
-        let productName = getProperty(device, key: kIOHIDProductKey) as? String ?? "Unknown Device"
+        let productName = getProperty(device, key: kIOHIDProductKey) as? String ?? "ATTACK SHARK X11 Mouse"
+        print("🟢 Connected: \(productName)")
         
-        print("🟢 ATTACK SHARK X11 Connected -> Name: \(productName) | VID: 0x\(String(vendorID, radix: 16)) | PID: 0x\(String(productID, radix: 16))")
-        
-        // Initialize transport layer for this device
-        let transport = DeviceTransport(hidDevice: device)
-        self.activeTransport = transport
-        
-        // Test command interface
-        DispatchQueue.global().asyncAfter(deadline: .now() + 0.5) {
-            print("🔍 Attempting to communicate with X11...")
-            if let data = transport.getFeatureReport(reportID: 0x0B, length: 8) {
-                print("✨ Success! Read data from mouse: \(data as NSData)")
-            } else {
-                print("ℹ️ Active input interface for X11.")
-            }
+        DispatchQueue.main.async {
+            self.onDeviceConnected?(productName, device)
         }
     }
     
     private func deviceDisconnected(_ device: IOHIDDevice) {
-        let productName = getProperty(device, key: kIOHIDProductKey) as? String ?? "Unknown Device"
-        print("🔴 ATTACK SHARK X11 Disconnected: \(productName)")
-        self.activeTransport = nil
+        print("🔴 Disconnected")
+        DispatchQueue.main.async {
+            self.onDeviceDisconnected?()
+        }
     }
     
     private func getProperty(_ device: IOHIDDevice, key: String) -> AnyObject? {

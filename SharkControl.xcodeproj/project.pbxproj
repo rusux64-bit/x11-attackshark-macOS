@@ -12,6 +12,7 @@
 		320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320317FE3090C73900111A9D /* ProtocolDefinitions.swift */; };
 		320318103090C9DB00111A9D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3203180F3090C9DB00111A9D /* ContentView.swift */; };
 		320318133090CC1700111A9D /* SharkControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318123090CC1700111A9D /* SharkControlApp.swift */; };
+		327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B993090D991008E9508 /* DeviceViewModel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -24,6 +25,7 @@
 		3203180F3090C9DB00111A9D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		320318113090CBEA00111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
 		320318123090CC1700111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
+		327C4B993090D991008E9508 /* DeviceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceViewModel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -46,6 +48,7 @@
 				320318023090C73900111A9D /* Services */,
 				320318053090C73900111A9D /* Views */,
 				000000000000000000000020 /* Products */,
+				327C4B983090D98B008E9508 /* ViewModels */,
 			);
 			sourceTree = "<group>";
 		};
@@ -80,6 +83,14 @@
 				3203180F3090C9DB00111A9D /* ContentView.swift */,
 			);
 			path = Views;
+			sourceTree = "<group>";
+		};
+		327C4B983090D98B008E9508 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				327C4B993090D991008E9508 /* DeviceViewModel.swift */,
+			);
+			path = ViewModels;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -146,6 +157,7 @@
 		000000000000000120000000 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			files = (
+				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
 				320318133090CC1700111A9D /* SharkControlApp.swift in Sources */,
 				320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */,
 				320318063090C73900111A9D /* DeviceTransport.swift in Sources */,
