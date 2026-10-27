@@ -20,6 +20,9 @@ public final class DeviceViewModel: ObservableObject {
             self.isConnected = true
             self.deviceName = name
             self.transport = DeviceTransport(hidDevice: device)
+            
+            // Apelăm automat citirea setărilor când se conectează
+            self.requestDeviceSettings()
         }
 
         scanner.onDeviceDisconnected = { [weak self] in
@@ -30,5 +33,16 @@ public final class DeviceViewModel: ObservableObject {
         }
 
         scanner.startScanning()
+    }
+
+    // Metoda este acum plasată corect IN INTERIORUL clasei
+    public func requestDeviceSettings() {
+        guard let transport = transport else { return }
+        
+        // Typical HID report ID for battery/status query on Attack Shark X11
+        if let batteryData = transport.getFeatureReport(reportID: 0x0B, length: 8) {
+            print("🔋 Battery report data received: \(batteryData as NSData)")
+            // Parse battery percentage and charging status here based on report structure
+        }
     }
 }

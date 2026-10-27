@@ -8,39 +8,48 @@ public final class DeviceTransport {
         self.hidDevice = hidDevice
     }
     
-    /// Sends a HID feature report to the device.
-    public func setFeatureReport(reportID: UInt8, data: Data) -> Bool {
-        let bytes = [UInt8](data)
-        let result = bytes.withUnsafeBytes { ptr -> IOReturn in
-            guard let baseAddress = ptr.baseAddress else { return kIOReturnError }
+    /// Sends a feature report to the mouse (e.g., changing DPI, polling rate, or lighting)
+    public func sendFeatureReport(reportID: UInt8, data: [UInt8]) -> Bool {
+        var reportBytes = data
+        let result = reportBytes.withUnsafeMutableBytes { buffer -> IOReturn in
+            guard let baseAddress = buffer.baseAddress else { return kIOReturnError }
             return IOHIDDeviceSetReport(
                 hidDevice,
-                kIOHIDReportTypeFeature,
+                kIOHIDReportTypeFeature, // Corectat aici
                 CFIndex(reportID),
-                baseAddress.assumingMemoryBound(to: UInt8.self),
-                bytes.count
+                baseAddress,
+                buffer.count
             )
         }
-        return result == kIOReturnSuccess
+        
+        if result != kIOReturnSuccess {
+            print("❌ Failed to send feature report ID 0x\(String(format: "%02X", reportID)): \(result)")
+            return false
+        }
+        return true
     }
     
-    /// Reads a HID feature report from the device.
+    /// Reads a feature report from the mouse (e.g., battery level, current DPI, status)
     public func getFeatureReport(reportID: UInt8, length: Int) -> Data? {
-        var buffer = [UInt8](repeating: 0, count: length)
+        var reportData = [UInt8](repeating: 0, count: length)
         var reportLength = CFIndex(length)
         
-        let result = buffer.withUnsafeMutableBytes { ptr -> IOReturn in
-            guard let baseAddress = ptr.baseAddress else { return kIOReturnError }
+        let result = reportData.withUnsafeMutableBytes { buffer -> IOReturn in
+            guard let baseAddress = buffer.baseAddress else { return kIOReturnError }
             return IOHIDDeviceGetReport(
                 hidDevice,
-                kIOHIDReportTypeFeature,
+                kIOHIDReportTypeFeature, // Corectat și aici
                 CFIndex(reportID),
-                baseAddress.assumingMemoryBound(to: UInt8.self),
+                baseAddress,
                 &reportLength
             )
         }
         
-        guard result == kIOReturnSuccess else { return nil }
-        return Data(buffer.prefix(reportLength))
+        if result != kIOReturnSuccess {
+            print("⚠️ Failed to get feature report ID 0x\(String(format: "%02X", reportID))")
+            return nil
+        }
+        
+        return Data(reportData.prefix(reportLength))
     }
 }
