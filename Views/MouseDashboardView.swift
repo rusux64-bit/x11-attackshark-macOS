@@ -14,6 +14,7 @@ public struct MouseDashboardView: View {
         VStack(spacing: 0) {
             // Top Status Bar
             HStack(spacing: 20) {
+                // Connection badge
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isWiredConnection ? "cable.connector" : "wifi")
                         .foregroundColor(.accentColor)
@@ -28,6 +29,7 @@ public struct MouseDashboardView: View {
                 
                 Spacer()
                 
+                // Battery indicator (top right)
                 HStack(spacing: 8) {
                     Image(systemName: batteryIcon(for: viewModel.batteryLevel))
                         .foregroundColor(batteryColor(for: viewModel.batteryLevel))
@@ -40,8 +42,9 @@ public struct MouseDashboardView: View {
                 .padding(.vertical, 6)
                 .background(batteryColor(for: viewModel.batteryLevel).opacity(0.15))
                 .cornerRadius(8)
+                .animation(.easeInOut(duration: 0.3), value: viewModel.batteryLevel)
                 
-                // Boton cu hitbox (range) mult mai mare
+                // Dark / Light Mode Button
                 Button(action: {
                     withAnimation(.spring(response: 0.5, dampingFraction: 0.7, blendDuration: 0)) {
                         isDarkMode.toggle()
@@ -52,9 +55,9 @@ public struct MouseDashboardView: View {
                         .font(.system(size: 16))
                         .scaleEffect(isDarkMode ? 1.0 : 0.95)
                         .transition(.scale.combined(with: .opacity))
-                        .padding(.horizontal, 14) // Mărește zona de click pe lățime
-                        .padding(.vertical, 10)   // Mărește zona de click pe înălțime
-                        .contentShape(Rectangle()) // Face toată suprafața padding-ului clicabilă
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 10)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .background(Color.secondary.opacity(0.15))
@@ -166,15 +169,21 @@ public struct MouseDashboardView: View {
     }
     
     private func batteryColor(for level: Int) -> Color {
+        if viewModel.isCharging {
+            return .green
+        }
         switch level {
-        case 70...100: return .green
-        case 40..<70:  return .yellow
-        case 20..<40:  return .orange
+        case 60...100: return .green
+        case 30..<60:  return .yellow
+        case 15..<30:  return .orange
         default:       return .red
         }
     }
     
     private func batteryIcon(for level: Int) -> String {
+        if viewModel.isCharging {
+            return "battery.100.bolt"
+        }
         switch level {
         case 75...100: return "battery.100"
         case 50..<75:  return "battery.75"
