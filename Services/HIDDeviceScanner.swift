@@ -65,9 +65,16 @@ public final class HIDDeviceScanner {
             scanner.detachDevice(device)
         }, selfPointer)
         
-        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue as CFString)
-        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
         
+        IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetMain(), CFRunLoopMode.commonModes.rawValue as CFString)
+
+        let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if openResult != kIOReturnSuccess {
+            print("❌ IOHIDManagerOpen failed: 0x" + String(UInt32(bitPattern: openResult), radix: 16))
+        } else {
+            print("✅ IOHIDManagerOpen OK")
+        }
+
         // Also attach any devices already connected
         if let existingDevices = IOHIDManagerCopyDevices(manager) as? Set<IOHIDDevice> {
             for dev in existingDevices {
@@ -87,7 +94,11 @@ public final class HIDDeviceScanner {
         let productName = getProperty(device, key: kIOHIDProductKey) as? String ?? "ATTACK SHARK X11 Mouse"
         let maxFeature = (getProperty(device, key: "MaxFeatureReportSize") as? Int) ?? 0
         let maxInput = (getProperty(device, key: "MaxInputReportSize") as? Int) ?? 0
+        
         print("🟢 Connected endpoint: \(productName) (Feature: \(maxFeature), Input: \(maxInput))")
+        let usagePage = getProperty(device, key: kIOHIDPrimaryUsagePageKey) as? Int ?? -1
+        print("   usagePage=0x\(String(usagePage, radix: 16))")
+        
         
         let context = EndpointContext(scanner: self, device: device)
         activeContexts.append(context)
@@ -140,3 +151,5 @@ public final class HIDDeviceScanner {
         }
     }
 }
+
+

@@ -6,18 +6,16 @@ import IOKit.hid
 public final class DeviceViewModel: ObservableObject {
     @Published public var isConnected: Bool = false
     @Published public var deviceName: String = "No device connected"
-    @Published public var batteryLevel: Int = 69
+    @Published public var batteryLevel: Int = 0                 // (A) nu mai e 69
+    @Published public var hasBatteryReading: Bool = false       // (A) true doar dacă am primit un heartbeat real
     @Published public var isCharging: Bool = false
     @Published public var isWiredConnection: Bool = false
 
     private let scanner = HIDDeviceScanner()
-    private var transport: DeviceTransport?
+    private var lastHeartbeat: Date?                            // (A) momentul ultimului heartbeat
+    private var watchdog: Timer?                                // (A) verifică periodic dacă mouse-ul tace
 
     public init() {
-        let savedLevel = UserDefaults.standard.integer(forKey: "AttackShark_LastBatteryLevel")
-        if savedLevel > 0 && savedLevel <= 100 {
-            self.batteryLevel = savedLevel
-        }
         setupScanner()
     }
 
@@ -30,8 +28,7 @@ public final class DeviceViewModel: ObservableObject {
             guard let self = self else { return }
             self.isConnected = true
             self.deviceName = name
-            
-            // Check PID to distinguish Wired Cable (0xFA55) from 2.4G Receiver (0xFA60)
+
             if let pidValue = IOHIDDeviceGetProperty(device, kIOHIDProductIDKey as CFString) as? Int {
                 self.isWiredConnection = (pidValue == 0xFA55)
                 if self.isWiredConnection {
@@ -44,12 +41,7 @@ public final class DeviceViewModel: ObservableObject {
                     self.isCharging = true
                 }
             }
-            
-            let maxFeature = (IOHIDDeviceGetProperty(device, "MaxFeatureReportSize" as CFString) as? Int) ?? 0
-            if self.transport == nil || maxFeature >= 64 {
-                self.transport = DeviceTransport(hidDevice: device)
-                self.sendHandshake()
-            }
+            // (C) handshake-ul și crearea DeviceTransport au fost șterse: bateria nu are nevoie de scrieri
         }
 
         scanner.onDeviceDisconnected = { [weak self] in
@@ -58,45 +50,33 @@ public final class DeviceViewModel: ObservableObject {
             self.deviceName = "No device connected"
             self.isWiredConnection = false
             self.isCharging = false
-            self.transport = nil
+            self.hasBatteryReading = false
+            self.lastHeartbeat = nil
         }
 
         scanner.startScanning()
+
+        // (B) Watchdog: dacă n-a venit niciun heartbeat în 6 secunde, mouse-ul e adormit/offline
+        watchdog = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
+            guard let self = self, let last = self.lastHeartbeat else { return }
+            if Date().timeIntervalSince(last) > 6 { self.hasBatteryReading = false }
+        }
     }
 
-    public func sendHandshake() {
-        guard let transport = transport else { return }
-        var handshake = [UInt8](repeating: 0, count: 24)
-        handshake[0] = 0x09
-        handshake[1] = 0x01
-        _ = transport.sendFeatureReport(reportID: 0x09, data: handshake)
-    }
-
+    // (D) Parserul de heartbeat: 03 55 40 <stare> <procent>
     private func processInputReport(data: Data, reportID: UInt32) {
-        let bytes = [UInt8](data)
-        guard bytes.count >= 4 else { return }
+        let raw = [UInt8](data)
+        print("📥 input:", raw.map { String(format: "%02x", $0) }.joined(separator: " "))
 
-        var payload = bytes
-        if payload.first == 0x03 {
-            payload.removeFirst()
-        }
+        // Normalizează: dacă report ID (0x03) lipsește din buffer, îl adăugăm
+        let b = (raw.first == 0x03) ? raw : [0x03] + raw
+        guard b.count >= 5, b[1] == 0x55, b[2] == ProtocolConstants.evBattery else { return }
 
-        // Expected report: [0x55, 0x40, <statusFlag>, <batteryLevel>]
-        if let idx = payload.firstIndex(of: ProtocolConstants.evBattery), idx > 0, payload.count > idx + 2 {
-            let model = payload[idx - 1]
-            if model == 0x55 || model == 0x02 {
-                let statusFlag = payload[idx + 1]
-                let level = Int(payload[idx + 2])
-                
-                if level > 0 && level <= 100 {
-                    DispatchQueue.main.async {
-                        self.batteryLevel = level
-                        self.isCharging = (statusFlag == ProtocolConstants.chargingFlag) || self.isWiredConnection
-                        UserDefaults.standard.set(level, forKey: "AttackShark_LastBatteryLevel")
-                        print("🔋 Real Attack Shark battery updated: \(level)%, Charging: \(self.isCharging)")
-                    }
-                }
-            }
-        }
+        let state = b[3]
+        let level = min(Int(b[4]), 100)
+        lastHeartbeat = Date()
+        batteryLevel = level
+        hasBatteryReading = true
+        isCharging = (state == ProtocolConstants.chargingFlag) || isWiredConnection
     }
 }

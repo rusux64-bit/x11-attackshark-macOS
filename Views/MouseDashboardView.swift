@@ -33,7 +33,7 @@ public struct MouseDashboardView: View {
                 HStack(spacing: 8) {
                     Image(systemName: batteryIcon(for: viewModel.batteryLevel))
                         .foregroundColor(batteryColor(for: viewModel.batteryLevel))
-                    Text("\(viewModel.batteryLevel)% Battery")
+                    Text(viewModel.hasBatteryReading ? "\(viewModel.batteryLevel)% Battery" : "Battery: — (mouse adormit?)")
                         .font(.subheadline)
                         .fontWeight(.semibold)
                         .foregroundColor(batteryColor(for: viewModel.batteryLevel))
@@ -161,6 +161,17 @@ public struct MouseDashboardView: View {
                 .padding(30)
             }
             .padding(25)
+            .onContinuousHover { phase in
+                switch phase {
+                case .active:
+                    inputMonitor.startMonitoring()
+                case .ended:
+                    inputMonitor.stopMonitoring()
+                }
+            }
+            .onDisappear {
+                inputMonitor.stopMonitoring()
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(isDarkMode ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))

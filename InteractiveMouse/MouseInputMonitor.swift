@@ -22,10 +22,6 @@ public final class MouseInputMonitor: ObservableObject {
     private var localMonitor: Any?
     private var scrollWorkItem: DispatchWorkItem?
     
-    public init() {
-        startMonitoring()
-    }
-    
     deinit {
         stopMonitoring()
     }
@@ -40,6 +36,8 @@ public final class MouseInputMonitor: ObservableObject {
     }
     
     public func startMonitoring() {
+        guard localMonitor == nil else { return }
+
         localMonitor = NSEvent.addLocalMonitorForEvents(matching: [.leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp, .otherMouseDown, .otherMouseUp, .scrollWheel]) { [weak self] event in
             self?.handleNSEvent(event)
             return event
@@ -51,6 +49,9 @@ public final class MouseInputMonitor: ObservableObject {
             NSEvent.removeMonitor(localMonitor)
             self.localMonitor = nil
         }
+        scrollWorkItem?.cancel()
+        scrollWorkItem = nil
+        activeButtons.removeAll()
     }
     
     private func handleNSEvent(_ event: NSEvent) {

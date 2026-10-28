@@ -33,10 +33,18 @@ private struct ConnectionStatusView: View {
                 .font(.headline)
                 .foregroundColor(.secondary)
             
-            Text("Waiting for ATTACK SHARK X11 device...")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .padding(.top, 10)
+            VStack(spacing: 6) {
+                Text("Waiting for ATTACK SHARK X11 device...")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                
+                Text("Bluetooth is not supported. Please connect your mouse using a USB cable or a 2.4 GHz wireless dongle")
+                    .font(.footnote)
+                    .foregroundColor(.secondary)
+                    .opacity(0.8)
+            }
+            .padding(.top, 10)
+            
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
