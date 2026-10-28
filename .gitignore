@@ -1,1 +1,8 @@
+# Local development files
+AGENTS.md
 .DS_Store
+.build/
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/

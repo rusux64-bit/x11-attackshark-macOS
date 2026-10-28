@@ -12,6 +12,7 @@
 		320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320317FE3090C73900111A9D /* ProtocolDefinitions.swift */; };
 		320318103090C9DB00111A9D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3203180F3090C9DB00111A9D /* ContentView.swift */; };
 		320318133090CC1700111A9D /* SharkControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318123090CC1700111A9D /* SharkControlApp.swift */; };
+		32126A6F30925D58004A76CC /* DPICodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32126A6E30925D58004A76CC /* DPICodec.swift */; };
 		327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B993090D991008E9508 /* DeviceViewModel.swift */; };
 		327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B9D3090E300008E9508 /* MouseDashboardView.swift */; };
 		327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */; };
@@ -73,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				320317FE3090C73900111A9D /* ProtocolDefinitions.swift */,
+				32126A6E30925D58004A76CC /* DPICodec.swift */,
 			);
 			path = Protocol;
 			sourceTree = "<group>";
@@ -179,6 +181,7 @@
 				327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */,
 				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
 				320318133090CC1700111A9D /* SharkControlApp.swift in Sources */,
+				32126A6F30925D58004A76CC /* DPICodec.swift in Sources */,
 				320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */,
 				320318063090C73900111A9D /* DeviceTransport.swift in Sources */,
 				327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */,
