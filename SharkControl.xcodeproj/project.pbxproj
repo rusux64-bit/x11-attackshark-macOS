@@ -12,11 +12,14 @@
 		320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320317FE3090C73900111A9D /* ProtocolDefinitions.swift */; };
 		320318103090C9DB00111A9D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3203180F3090C9DB00111A9D /* ContentView.swift */; };
 		320318133090CC1700111A9D /* SharkControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318123090CC1700111A9D /* SharkControlApp.swift */; };
-		32126A6F30925D58004A76CC /* DPICodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32126A6E30925D58004A76CC /* DPICodec.swift */; };
+		32126A6F30925D58004A76CC /* (null) in Sources */ = {isa = PBXBuildFile; };
 		327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B993090D991008E9508 /* DeviceViewModel.swift */; };
 		327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B9D3090E300008E9508 /* MouseDashboardView.swift */; };
 		327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */; };
 		327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */; };
+		327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */; };
+		327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB23090F000008E9508 /* MouseSVG.swift */; };
+		327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB43090F000008E9508 /* MouseVisualizerView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -34,6 +37,9 @@
 		327C4BA23090E993008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseInputMonitor.swift; sourceTree = "<group>"; };
 		327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MouseInputMonitor.swift; path = InteractiveMouse/MouseInputMonitor.swift; sourceTree = "<group>"; };
 		327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveMouseTestView.swift; sourceTree = "<group>"; };
+		327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMouseInputMonitor.swift; sourceTree = "<group>"; };
+		327C4BB23090F000008E9508 /* MouseSVG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseSVG.swift; sourceTree = "<group>"; };
+		327C4BB43090F000008E9508 /* MouseVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseVisualizerView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -74,7 +80,6 @@
 			isa = PBXGroup;
 			children = (
 				320317FE3090C73900111A9D /* ProtocolDefinitions.swift */,
-				32126A6E30925D58004A76CC /* DPICodec.swift */,
 			);
 			path = Protocol;
 			sourceTree = "<group>";
@@ -110,6 +115,9 @@
 			isa = PBXGroup;
 			children = (
 				327C4BA23090E993008E9508 /* MouseInputMonitor.swift */,
+				327C4BB43090F000008E9508 /* MouseVisualizerView.swift */,
+				327C4BB23090F000008E9508 /* MouseSVG.swift */,
+				327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */,
 			);
 			path = InteractiveMouse;
 			sourceTree = "<group>";
@@ -179,9 +187,12 @@
 			isa = PBXSourcesBuildPhase;
 			files = (
 				327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */,
+				327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */,
+				327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */,
+				327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */,
 				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
 				320318133090CC1700111A9D /* SharkControlApp.swift in Sources */,
-				32126A6F30925D58004A76CC /* DPICodec.swift in Sources */,
+				32126A6F30925D58004A76CC /* (null) in Sources */,
 				320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */,
 				320318063090C73900111A9D /* DeviceTransport.swift in Sources */,
 				327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */,
@@ -331,7 +342,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
@@ -368,7 +389,17 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
 				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;

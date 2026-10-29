@@ -4,8 +4,6 @@ public struct MouseDashboardView: View {
     @ObservedObject public var viewModel: DeviceViewModel
     @AppStorage("isDarkMode") private var isDarkMode: Bool = true
     
-    @StateObject private var inputMonitor = MouseInputMonitor()
-
     public init(viewModel: DeviceViewModel) {
         self.viewModel = viewModel
     }
@@ -79,99 +77,20 @@ public struct MouseDashboardView: View {
                         .fontWeight(.bold)
                         .foregroundColor(.secondary)
                         .tracking(2)
-                    
-                    ZStack {
-                        // Clean Mouse Body Silhouette
-                        Capsule()
-                            .fill(isDarkMode ? Color(nsColor: .darkGray).opacity(0.6) : Color(nsColor: .controlBackgroundColor))
-                            .frame(width: 160, height: 280)
-                            .overlay(
-                                Capsule()
-                                    .stroke(Color.secondary.opacity(0.3), lineWidth: 2)
-                            )
-                        
-                        // Left Click Button Zone
-                        UnevenRoundedRectangle(topLeadingRadius: 70, bottomLeadingRadius: 20, bottomTrailingRadius: 10, topTrailingRadius: 10)
-                            .fill(inputMonitor.activeButtons.contains(.left) ? Color.orange : (isDarkMode ? Color.gray.opacity(0.3) : Color.gray.opacity(0.15)))
-                            .frame(width: 74, height: 110)
-                            .offset(x: -41, y: -75)
-                            .animation(.easeInOut(duration: 0.1), value: inputMonitor.activeButtons.contains(.left))
-                            .onTapGesture { inputMonitor.simulateClick(.left) }
-                        
-                        // Right Click Button Zone
-                        UnevenRoundedRectangle(topLeadingRadius: 10, bottomLeadingRadius: 10, bottomTrailingRadius: 20, topTrailingRadius: 70)
-                            .fill(inputMonitor.activeButtons.contains(.right) ? Color.orange : (isDarkMode ? Color.gray.opacity(0.3) : Color.gray.opacity(0.15)))
-                            .frame(width: 74, height: 110)
-                            .offset(x: 41, y: -75)
-                            .animation(.easeInOut(duration: 0.1), value: inputMonitor.activeButtons.contains(.right))
-                            .onTapGesture { inputMonitor.simulateClick(.right) }
-                        
-                        // Scroll Wheel / Middle Click
-                        Capsule()
-                            .fill(inputMonitor.activeButtons.contains(.middle) ? Color.orange : Color.secondary.opacity(0.6))
-                            .frame(width: 16, height: 50)
-                            .offset(x: 0, y: -70)
-                            .animation(.easeInOut(duration: 0.1), value: inputMonitor.activeButtons.contains(.middle))
-                            .onTapGesture { inputMonitor.simulateClick(.middle) }
-                        
-                        // Scroll Up Indicator (Just above the wheel)
-                        Image(systemName: "chevron.up.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.orange)
-                            .opacity(inputMonitor.activeButtons.contains(.scrollUp) ? 1.0 : 0.0)
-                            .offset(x: 0, y: -108)
-                            .animation(.easeInOut(duration: 0.15), value: inputMonitor.activeButtons.contains(.scrollUp))
-                        
-                        // Scroll Down Indicator (Just below the wheel)
-                        Image(systemName: "chevron.down.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(.orange)
-                            .opacity(inputMonitor.activeButtons.contains(.scrollDown) ? 1.0 : 0.0)
-                            .offset(x: 0, y: -32)
-                            .animation(.easeInOut(duration: 0.15), value: inputMonitor.activeButtons.contains(.scrollDown))
-                        
-                        // DPI / LED Indicator Strip
-                        Capsule()
-                            .fill(Color.cyan)
-                            .frame(width: 8, height: 16)
-                            .offset(x: 0, y: -5)
-                        
-                        // Side Forward Button (Left Side)
-                        Capsule()
-                            .fill(inputMonitor.activeButtons.contains(.forward) ? Color.orange : Color.secondary.opacity(0.4))
-                            .frame(width: 32, height: 10)
-                            .offset(x: -88, y: 15)
-                            .animation(.easeInOut(duration: 0.1), value: inputMonitor.activeButtons.contains(.forward))
-                            .onTapGesture { inputMonitor.simulateClick(.forward) }
-                        
-                        // Side Back Button (Left Side)
-                        Capsule()
-                            .fill(inputMonitor.activeButtons.contains(.back) ? Color.orange : Color.secondary.opacity(0.4))
-                            .frame(width: 32, height: 10)
-                            .offset(x: -88, y: 35)
-                            .animation(.easeInOut(duration: 0.1), value: inputMonitor.activeButtons.contains(.back))
-                            .onTapGesture { inputMonitor.simulateClick(.back) }
-                    }
-                    .frame(height: 320)
-                    
-                    Text("Click buttons or scroll up/down to test interactively")
+
+                    // Real SVG illustration; highlights follow physical mouse events (see MouseInputMonitor).
+                    MouseVisualizerView()
+                        .aspectRatio(520.0 / 1000.0, contentMode: .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                    Text("Press a mouse button or scroll the wheel to test")
                         .font(.subheadline)
                         .foregroundColor(.secondary)
                 }
-                .padding(30)
+                .padding(.horizontal, 30)
+                .padding(.vertical, 24)
             }
             .padding(25)
-            .onContinuousHover { phase in
-                switch phase {
-                case .active:
-                    inputMonitor.startMonitoring()
-                case .ended:
-                    inputMonitor.stopMonitoring()
-                }
-            }
-            .onDisappear {
-                inputMonitor.stopMonitoring()
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(isDarkMode ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))

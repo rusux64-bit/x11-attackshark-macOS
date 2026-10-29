@@ -1,7 +1,7 @@
 import SwiftUI
 
 struct InteractiveMouseTestView: View {
-    @StateObject private var monitor = MouseInputMonitor()
+    @StateObject private var monitor = LegacyMouseInputMonitor()
     
     // Dimensiunea pătratului de testare (300x300 pixeli)
     private let boxSize: CGFloat = 300.0

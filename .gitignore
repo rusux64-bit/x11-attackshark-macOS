@@ -1,8 +1,18 @@
-# Local development files
-AGENTS.md
+# macOS Finder metadata
 .DS_Store
-.build/
+
+# Xcode per-user state and build products
 xcuserdata/
 *.xcuserstate
 DerivedData/
 build/
+*.xccheckout
+*.moved-aside
+*.xcuserdatad
+
+# Swift Package Manager build state
+.build/
+.swiftpm/xcode/xcuserdata/
+
+# Local repository instructions
+AGENTS.md
