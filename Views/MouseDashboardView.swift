@@ -79,7 +79,7 @@ public struct MouseDashboardView: View {
                         .tracking(2)
 
                     // Real SVG illustration; highlights follow physical mouse events (see MouseInputMonitor).
-                    MouseVisualizerView()
+                    MouseVisualizerView(isDark: isDarkMode)
                         .aspectRatio(520.0 / 1000.0, contentMode: .fit)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
 
