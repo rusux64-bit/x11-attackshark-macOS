@@ -1,6 +1,8 @@
 import Foundation
 
-public enum ProtocolConstants {
+// `nonisolated`: the app target defaults to @MainActor, but the HID I/O (which uses this codec)
+// runs on a background queue.
+public nonisolated enum ProtocolConstants {
     public static let vendorID: Int = 0x1D57
     public static let productReceiver: Int = 0xFA60
     public static let productWired: Int = 0xFA55
@@ -31,7 +33,7 @@ public enum ProtocolConstants {
     public static let chargingFlag: UInt8 = 0x03
 }
 
-public struct ProtocolHelper {
+public nonisolated struct ProtocolHelper {
     /// Computes a 16-bit big-endian checksum of the data block.
     public static func checksum(data: [UInt8]) -> [UInt8] {
         let sum = data.reduce(0) { ($0 + Int($1)) & 0xFFFF }

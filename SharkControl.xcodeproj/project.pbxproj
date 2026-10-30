@@ -21,6 +21,7 @@
 		327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB23090F000008E9508 /* MouseSVG.swift */; };
 		327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB43090F000008E9508 /* MouseVisualizerView.swift */; };
 		327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BC03090F100008E9508 /* ConfigPanelView.swift */; };
+		327C4BD13090F200008E9508 /* DPICodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BD03090F200008E9508 /* DPICodec.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -42,6 +43,7 @@
 		327C4BB23090F000008E9508 /* MouseSVG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseSVG.swift; sourceTree = "<group>"; };
 		327C4BB43090F000008E9508 /* MouseVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseVisualizerView.swift; sourceTree = "<group>"; };
 		327C4BC03090F100008E9508 /* ConfigPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigPanelView.swift; sourceTree = "<group>"; };
+		327C4BD03090F200008E9508 /* DPICodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DPICodec.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -82,6 +84,7 @@
 			isa = PBXGroup;
 			children = (
 				320317FE3090C73900111A9D /* ProtocolDefinitions.swift */,
+				327C4BD03090F200008E9508 /* DPICodec.swift */,
 			);
 			path = Protocol;
 			sourceTree = "<group>";
@@ -201,6 +204,7 @@
 				327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */,
 				320318103090C9DB00111A9D /* ContentView.swift in Sources */,
 				320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */,
+				327C4BD13090F200008E9508 /* DPICodec.swift in Sources */,
 				327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */,
 				327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */,
 			);

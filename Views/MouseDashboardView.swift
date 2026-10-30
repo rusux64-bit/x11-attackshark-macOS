@@ -13,7 +13,8 @@ public struct MouseDashboardView: View {
     public var body: some View {
         VStack(spacing: 0) {
             // Top Status Bar
-            HStack(spacing: 20) {
+            ZStack {
+                HStack(spacing: 20) {
                 // Connection badge
                 HStack(spacing: 6) {
                     Image(systemName: viewModel.isWiredConnection ? "cable.connector" : "wifi")
@@ -62,6 +63,12 @@ public struct MouseDashboardView: View {
                 .buttonStyle(.plain)
                 .background(Color.secondary.opacity(0.15))
                 .cornerRadius(8)
+                }
+
+                Text("Attack Shark X11")
+                    .font(.headline)
+                    .fontWeight(.semibold)
+                    .accessibilityAddTraits(.isHeader)
             }
             .padding(20)
             
@@ -72,7 +79,7 @@ public struct MouseDashboardView: View {
                 livePanel
                     .frame(minWidth: 240, idealWidth: 290, maxWidth: 330)
 
-                ConfigPanelView(isDark: isDarkMode)
+                ConfigPanelView(isDark: isDarkMode, device: viewModel)
                     .frame(maxWidth: .infinity)
             }
             .padding(25)

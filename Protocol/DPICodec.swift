@@ -1,6 +1,6 @@
 import Foundation
 
-public enum ProtocolError: Error, Equatable {
+public nonisolated enum ProtocolError: Error, Equatable {
     case badLength(expected: Int, actual: Int)
     case unexpectedReportID(expected: UInt8, actual: UInt8)
     case invalidReportedLength(expected: UInt8, actual: UInt8)
@@ -13,7 +13,7 @@ public enum ProtocolError: Error, Equatable {
     case invalidActiveStage(Int)
 }
 
-public struct DPIColor: Equatable, Sendable {
+public nonisolated struct DPIColor: Equatable, Sendable {
     public let red: UInt8
     public let green: UInt8
     public let blue: UInt8
@@ -33,7 +33,7 @@ public struct DPIColor: Equatable, Sendable {
     public static let white = DPIColor(red: 0xFF, green: 0xFF, blue: 0xFF)
 }
 
-public struct DPISensorCode: Equatable, Sendable {
+public nonisolated struct DPISensorCode: Equatable, Sendable {
     public let code: UInt8
     public let lowRange: Bool
     public let highRange: Bool
@@ -45,7 +45,7 @@ public struct DPISensorCode: Equatable, Sendable {
     }
 }
 
-public struct DPIStage: Equatable, Sendable {
+public nonisolated struct DPIStage: Equatable, Sendable {
     public var dpi: Int
     public var isEnabled: Bool
     public var color: DPIColor
@@ -66,7 +66,7 @@ public struct DPIStage: Equatable, Sendable {
     }
 }
 
-public struct DPIConfiguration: Equatable, Sendable {
+public nonisolated struct DPIConfiguration: Equatable, Sendable {
     public var angleSnap: Bool
     public var rippleControl: Bool
     public var stages: [DPIStage]
@@ -90,7 +90,7 @@ public struct DPIConfiguration: Equatable, Sendable {
     }
 }
 
-public enum DPIProtocol {
+public nonisolated enum DPIProtocol {
     private static let reportLength = 56
     private static let checksumOffset = 50
     private static let stageCount = 8
