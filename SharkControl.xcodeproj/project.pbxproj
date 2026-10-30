@@ -20,6 +20,7 @@
 		327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */; };
 		327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB23090F000008E9508 /* MouseSVG.swift */; };
 		327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB43090F000008E9508 /* MouseVisualizerView.swift */; };
+		327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BC03090F100008E9508 /* ConfigPanelView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,6 +41,7 @@
 		327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMouseInputMonitor.swift; sourceTree = "<group>"; };
 		327C4BB23090F000008E9508 /* MouseSVG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseSVG.swift; sourceTree = "<group>"; };
 		327C4BB43090F000008E9508 /* MouseVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseVisualizerView.swift; sourceTree = "<group>"; };
+		327C4BC03090F100008E9508 /* ConfigPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigPanelView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -97,6 +99,7 @@
 			isa = PBXGroup;
 			children = (
 				327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */,
+				327C4BC03090F100008E9508 /* ConfigPanelView.swift */,
 				327C4B9D3090E300008E9508 /* MouseDashboardView.swift */,
 				3203180F3090C9DB00111A9D /* ContentView.swift */,
 			);
@@ -199,6 +202,7 @@
 				320318103090C9DB00111A9D /* ContentView.swift in Sources */,
 				320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */,
 				327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */,
+				327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */,
 			);
 		};
 /* End PBXSourcesBuildPhase section */

@@ -15,8 +15,34 @@ private final class VisualizerWebView: WKWebView {
     }
 }
 
+/// The screen area in which mouse presses / scrolls are visualized (the dashboard's test panel).
+/// Only the frontmost window at the pointer counts, so another app covering the panel is ignored.
+final class MouseTestZone {
+    fileprivate weak var view: NSView?
+
+    func contains(screenPoint p: NSPoint) -> Bool {
+        guard let view, let window = view.window, window.isVisible else { return false }
+        let rect = window.convertToScreen(view.convert(view.bounds, to: nil))
+        guard rect.contains(p) else { return false }
+        return NSWindow.windowNumber(at: p, belowWindowWithWindowNumber: 0) == window.windowNumber
+    }
+}
+
+/// Invisible helper: attach with `.background(...)` to the view whose frame defines the zone.
+struct MouseTestZoneReader: NSViewRepresentable {
+    let zone: MouseTestZone
+    func makeNSView(context: Context) -> NSView {
+        let v = NSView()
+        zone.view = v
+        return v
+    }
+    func updateNSView(_ nsView: NSView, context: Context) { zone.view = nsView }
+}
+
 struct MouseVisualizerView: NSViewRepresentable {
     var isDark: Bool = true
+    /// nil = react to the physical mouse anywhere on macOS; otherwise only inside the zone.
+    var zone: MouseTestZone? = nil
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -25,7 +51,7 @@ struct MouseVisualizerView: NSViewRepresentable {
         web.setValue(false, forKey: "drawsBackground") // let the app's panel show through
         web.navigationDelegate = context.coordinator
         context.coordinator.theme = isDark
-        context.coordinator.attach(to: web)
+        context.coordinator.attach(to: web, zone: zone)
         web.loadHTMLString(Self.page(dark: isDark), baseURL: nil)
         return web
     }
@@ -48,8 +74,11 @@ struct MouseVisualizerView: NSViewRepresentable {
         private var pendingPressed: Set<MouseControl> = []
         var theme = true
 
-        func attach(to web: WKWebView) {
+        func attach(to web: WKWebView, zone: MouseTestZone?) {
             self.web = web
+            if let zone {
+                monitor.acceptsLocation = { [weak zone] p in zone?.contains(screenPoint: p) ?? false }
+            }
             monitor.onPressedChange = { [weak self] in self?.push(pressed: $0) }
             monitor.onScrollStep = { [weak self] dir in
                 guard self?.pageLoaded == true else { return }

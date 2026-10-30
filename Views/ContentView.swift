@@ -48,5 +48,8 @@ private struct ConnectionStatusView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+        // Waiting screen is dark-only (no theme switcher here); it must not inherit the dashboard's light mode.
+        .background(Color(nsColor: .windowBackgroundColor).ignoresSafeArea())
+        .preferredColorScheme(.dark)
     }
 }

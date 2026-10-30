@@ -3,6 +3,8 @@ import SwiftUI
 public struct MouseDashboardView: View {
     @ObservedObject public var viewModel: DeviceViewModel
     @AppStorage("isDarkMode") private var isDarkMode: Bool = true
+    /// Screen area where the physical mouse is visualized (the live-test panel only).
+    @State private var testZone = MouseTestZone()
     
     public init(viewModel: DeviceViewModel) {
         self.viewModel = viewModel
@@ -65,30 +67,13 @@ public struct MouseDashboardView: View {
             
             Divider()
             
-            // Center Clean Schematic Area & Scroll Animations
-            ZStack {
-                RoundedRectangle(cornerRadius: 24)
-                    .fill(isDarkMode ? Color.black.opacity(0.4) : Color.white)
-                    .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 5)
-                
-                VStack(spacing: 15) {
-                    Text("ATTACK SHARK X11 — LIVE TEST")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.secondary)
-                        .tracking(2)
+            // Live test (left, narrow) + configuration menu (right)
+            HStack(spacing: 20) {
+                livePanel
+                    .frame(minWidth: 240, idealWidth: 290, maxWidth: 330)
 
-                    // Real SVG illustration; highlights follow physical mouse events (see MouseInputMonitor).
-                    MouseVisualizerView(isDark: isDarkMode)
-                        .aspectRatio(520.0 / 1000.0, contentMode: .fit)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                    Text("Press a mouse button or scroll the wheel to test")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.horizontal, 30)
-                .padding(.vertical, 24)
+                ConfigPanelView(isDark: isDarkMode)
+                    .frame(maxWidth: .infinity)
             }
             .padding(25)
         }
@@ -96,6 +81,37 @@ public struct MouseDashboardView: View {
         .background(isDarkMode ? Color(nsColor: .windowBackgroundColor) : Color(nsColor: .controlBackgroundColor))
         .preferredColorScheme(isDarkMode ? .dark : .light)
         .animation(.easeInOut(duration: 0.5), value: isDarkMode)
+    }
+
+    /// Narrow panel with the SVG mouse that lights up on physical clicks / scrolling.
+    private var livePanel: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 24)
+                .fill(isDarkMode ? Color.black.opacity(0.4) : Color.white)
+                .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 5)
+            
+            VStack(spacing: 15) {
+                Text("Live Test")
+                    .font(.system(size: 10))
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.secondary)
+                    .tracking(2)
+
+                // Real SVG illustration; highlights follow physical mouse events (see MouseInputMonitor).
+                MouseVisualizerView(isDark: isDarkMode, zone: testZone)
+                    .aspectRatio(520.0 / 1000.0, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                Text("Press a button or scroll the wheel to test")
+                    .font(.caption)
+                    .multilineTextAlignment(.center)
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 20)
+            .padding(.vertical, 24)
+        }
+        .background(MouseTestZoneReader(zone: testZone))
     }
     
     private func batteryColor(for level: Int) -> Color {

@@ -15,6 +15,14 @@ public final class DeviceViewModel: ObservableObject {
     private var lastHeartbeat: Date?                            // (A) momentul ultimului heartbeat
     private var watchdog: Timer?                                // (A) verifică periodic dacă mouse-ul tace
 
+    /// Product ID of every HID endpoint that is attached right now (the mouse exposes several).
+    /// This tells "cable plugged in" apart from "cable unplugged, but the 2.4G receiver is still there".
+    private var endpointPIDs: [ObjectIdentifier: Int] = [:]
+    /// Charging flag exactly as the mouse reported it in its last heartbeat.
+    private var reportedCharging = false
+    /// Last (state, level) that was logged, so the console only shows real changes.
+    private var lastLogged: (state: UInt8, level: Int)?
+
     public init() {
         setupScanner()
     }
@@ -29,25 +37,36 @@ public final class DeviceViewModel: ObservableObject {
             self.isConnected = true
             self.deviceName = name
 
+            let pid: Int
             if let pidValue = IOHIDDeviceGetProperty(device, kIOHIDProductIDKey as CFString) as? Int {
-                self.isWiredConnection = (pidValue == 0xFA55)
-                if self.isWiredConnection {
-                    self.isCharging = true
-                }
-                print("🔍 Connected Device PID: 0x\(String(format: "%04X", pidValue)), Is Wired: \(self.isWiredConnection)")
+                pid = pidValue
             } else {
-                self.isWiredConnection = name.lowercased().contains("wired") || name.lowercased().contains("cable")
-                if self.isWiredConnection {
-                    self.isCharging = true
-                }
+                let lower = name.lowercased()
+                pid = (lower.contains("wired") || lower.contains("cable"))
+                    ? ProtocolConstants.productWired
+                    : ProtocolConstants.productReceiver
             }
+            self.endpointPIDs[ObjectIdentifier(device)] = pid
+            print("🔍 Connected Device PID: 0x\(String(format: "%04X", pid)), endpoints: \(self.endpointPIDs.count)")
+            self.refreshConnectionState()
             // (C) handshake-ul și crearea DeviceTransport au fost șterse: bateria nu are nevoie de scrieri
+        }
+
+        // Cablul poate fi scos în timp ce receiver-ul (2.4G) rămâne conectat: fără asta, starea
+        // "wired / charging" rămânea blocată până la repornirea aplicației.
+        scanner.onEndpointRemoved = { [weak self] device in
+            guard let self = self else { return }
+            self.endpointPIDs[ObjectIdentifier(device)] = nil
+            self.refreshConnectionState()
         }
 
         scanner.onDeviceDisconnected = { [weak self] in
             guard let self = self else { return }
             self.isConnected = false
             self.deviceName = "No device connected"
+            self.endpointPIDs.removeAll()
+            self.reportedCharging = false
+            self.lastLogged = nil
             self.isWiredConnection = false
             self.isCharging = false
             self.hasBatteryReading = false
@@ -61,6 +80,14 @@ public final class DeviceViewModel: ObservableObject {
             guard let self = self, let last = self.lastHeartbeat else { return }
             if Date().timeIntervalSince(last) > 6 { self.hasBatteryReading = false }
         }
+    }
+
+    /// Recomputes "wired" and "charging" from what is attached now + what the mouse last reported.
+    private func refreshConnectionState() {
+        let wired = endpointPIDs.values.contains(ProtocolConstants.productWired)
+        if wired != isWiredConnection { isWiredConnection = wired }
+        let charging = reportedCharging || wired
+        if charging != isCharging { isCharging = charging }
     }
 
     // (D) Parserul de heartbeat: 03 55 40 <stare> <procent>
@@ -77,6 +104,12 @@ public final class DeviceViewModel: ObservableObject {
         lastHeartbeat = Date()
         batteryLevel = level
         hasBatteryReading = true
-        isCharging = (state == ProtocolConstants.chargingFlag) || isWiredConnection
+        reportedCharging = (state == ProtocolConstants.chargingFlag)
+        refreshConnectionState()
+
+        if lastLogged?.state != state || lastLogged?.level != level {
+            lastLogged = (state, level)
+            print("🔋 battery \(level)% state=0x\(String(format: "%02X", state)) wired=\(isWiredConnection) charging=\(isCharging)")
+        }
     }
 }

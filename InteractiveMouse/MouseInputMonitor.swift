@@ -26,6 +26,9 @@ final class MouseInputMonitor {
     var onPressedChange: ((Set<MouseControl>) -> Void)?
     /// Called on the main thread for every physical wheel notch/step.
     var onScrollStep: ((ScrollDirection) -> Void)?
+    /// Decides (from the screen-space mouse location) whether a press/scroll should be visualized.
+    /// Default: accept everything (global). The dashboard narrows it to the test panel.
+    var acceptsLocation: (NSPoint) -> Bool = { _ in true }
 
     private(set) var isRunning = false
 
@@ -84,10 +87,14 @@ final class MouseInputMonitor {
     private func handle(_ event: NSEvent) {
         switch event.type {
         case .leftMouseDown, .rightMouseDown, .otherMouseDown:
+            // Presses outside the test zone (toolbar, theme button, other windows/apps) are ignored.
+            guard acceptsLocation(NSEvent.mouseLocation) else { return }
             if let control = MouseControl(rawValue: event.buttonNumber) { pressed.insert(control) }
         case .leftMouseUp, .rightMouseUp, .otherMouseUp:
+            // Releases are always honored so a highlight can never get stuck.
             if let control = MouseControl(rawValue: event.buttonNumber) { pressed.remove(control) }
         case .scrollWheel:
+            guard acceptsLocation(NSEvent.mouseLocation) else { return }
             handleScroll(event)
         default:
             break

@@ -29,6 +29,8 @@ public final class HIDDeviceScanner {
     public var onDeviceConnected: ((String, IOHIDDevice) -> Void)?
     public var onDeviceDisconnected: (() -> Void)?
     public var onInputReport: ((Data, UInt32, IOHIDDevice) -> Void)?
+    /// Fired for every single HID endpoint that disappears (cable unplugged, receiver removed...).
+    public var onEndpointRemoved: ((IOHIDDevice) -> Void)?
     
     private let targetVendorID: Int = 0x1D57
     private let cableProductID: Int = 0xFA55
@@ -131,6 +133,7 @@ public final class HIDDeviceScanner {
     private func detachDevice(_ device: IOHIDDevice) {
         activeContexts.removeAll(where: { $0.device == device })
         print("🔴 Disconnected endpoint. Remaining: \(activeContexts.count)")
+        DispatchQueue.main.async { self.onEndpointRemoved?(device) }
         
         if activeContexts.isEmpty {
             DispatchQueue.main.async {
