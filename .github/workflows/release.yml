@@ -46,6 +46,22 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
+      - name: Verify app name inside the build
+        run: |
+          echo "Building commit: $(git rev-parse --short HEAD)"
+          INFO="build/Release/X11 Software.app/Contents/Info.plist"
+          if [ ! -f "$INFO" ]; then
+            echo "Expected app not found. Contents of build/Release:"
+            ls -la build/Release
+            exit 1
+          fi
+          NAME=$(/usr/libexec/PlistBuddy -c "Print :CFBundleName" "$INFO")
+          echo "CFBundleName in built app: $NAME"
+          if [ "$NAME" != "X11 Software" ]; then
+            echo "CFBundleName must be X11 Software"
+            exit 1
+          fi
+
       - name: Package app into DMG
         run: |
           APP="build/Release/X11 Software.app"
