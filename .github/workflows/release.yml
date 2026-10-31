@@ -48,7 +48,7 @@ jobs:
 
       - name: Package app into DMG
         run: |
-          APP="build/Release/MyApp.app"
+          APP="build/Release/X11 Software.app"
           if [ ! -d "$APP" ]; then
             echo "Built app not found at $APP"
             exit 1
@@ -60,7 +60,7 @@ jobs:
           cp -R "$APP" "$STAGING/"
           ln -s /Applications "$STAGING/Applications"
           hdiutil create \
-            -volname "SharkControl ${VERSION}" \
+            -volname "X11 Software ${VERSION}" \
             -srcfolder "$STAGING" \
             -ov \
             -format UDZO \
@@ -95,9 +95,9 @@ jobs:
             echo
             echo "## Installation"
             echo
-            echo "This build is not signed or notarized. On first launch, right-click MyApp and choose Open, or run:"
+            echo "This build is not signed or notarized. On first launch, right-click X11 Software and choose Open, or run:"
             echo
-            echo '    xattr -dr com.apple.quarantine /Applications/MyApp.app'
+            echo '    xattr -dr com.apple.quarantine "/Applications/X11 Software.app"'
           } | python3 .github/scripts/strip_emoji.py > release-notes.md
 
           cat release-notes.md
@@ -108,5 +108,5 @@ jobs:
             "SharkControl-${VERSION}-unsigned.dmg" \
             --draft \
             --target "$GITHUB_SHA" \
-            --title "SharkControl ${VERSION}" \
+            --title "X11 Software ${VERSION}" \
             --notes-file release-notes.md

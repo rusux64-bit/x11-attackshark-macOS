@@ -1,0 +1,487 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 90;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		320318063090C73900111A9D /* DeviceTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318003090C73900111A9D /* DeviceTransport.swift */; };
+		320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318013090C73900111A9D /* HIDDeviceScanner.swift */; };
+		320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320317FE3090C73900111A9D /* ProtocolDefinitions.swift */; };
+		320318103090C9DB00111A9D /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3203180F3090C9DB00111A9D /* ContentView.swift */; };
+		320318133090CC1700111A9D /* SharkControlApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 320318123090CC1700111A9D /* SharkControlApp.swift */; };
+		32126A6F30925D58004A76CC /* (null) in Sources */ = {isa = PBXBuildFile; };
+		327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B993090D991008E9508 /* DeviceViewModel.swift */; };
+		327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4B9D3090E300008E9508 /* MouseDashboardView.swift */; };
+		327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */; };
+		327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */; };
+		327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */; };
+		327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB23090F000008E9508 /* MouseSVG.swift */; };
+		327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB43090F000008E9508 /* MouseVisualizerView.swift */; };
+		327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BC03090F100008E9508 /* ConfigPanelView.swift */; };
+		327C4BD13090F200008E9508 /* DPICodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BD03090F200008E9508 /* DPICodec.swift */; };
+		32CC644B3094C22C00AC64AF /* X11LogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32CC644A3094C22C00AC64AF /* X11LogoView.swift */; };
+		32CC644E3094C33700AC64AF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 32CC644D3094C33700AC64AF /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		000000000000000000000120 /* X11 Software.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "X11 Software.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		320317FE3090C73900111A9D /* ProtocolDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolDefinitions.swift; sourceTree = "<group>"; };
+		320318003090C73900111A9D /* DeviceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceTransport.swift; sourceTree = "<group>"; };
+		320318013090C73900111A9D /* HIDDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDDeviceScanner.swift; sourceTree = "<group>"; };
+		320318093090C7A800111A9D /* HIDDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = HIDDeviceScanner.swift; path = Services/HIDDeviceScanner.swift; sourceTree = "<group>"; };
+		3203180A3090C7A800111A9D /* DeviceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = DeviceTransport.swift; path = Services/DeviceTransport.swift; sourceTree = "<group>"; };
+		3203180F3090C9DB00111A9D /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		320318113090CBEA00111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
+		320318123090CC1700111A9D /* SharkControlApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharkControlApp.swift; sourceTree = "<group>"; };
+		327C4B993090D991008E9508 /* DeviceViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceViewModel.swift; sourceTree = "<group>"; };
+		327C4B9D3090E300008E9508 /* MouseDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseDashboardView.swift; sourceTree = "<group>"; };
+		327C4BA23090E993008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseInputMonitor.swift; sourceTree = "<group>"; };
+		327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = MouseInputMonitor.swift; path = InteractiveMouse/MouseInputMonitor.swift; sourceTree = "<group>"; };
+		327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InteractiveMouseTestView.swift; sourceTree = "<group>"; };
+		327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LegacyMouseInputMonitor.swift; sourceTree = "<group>"; };
+		327C4BB23090F000008E9508 /* MouseSVG.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseSVG.swift; sourceTree = "<group>"; };
+		327C4BB43090F000008E9508 /* MouseVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseVisualizerView.swift; sourceTree = "<group>"; };
+		327C4BC03090F100008E9508 /* ConfigPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigPanelView.swift; sourceTree = "<group>"; };
+		327C4BD03090F200008E9508 /* DPICodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DPICodec.swift; sourceTree = "<group>"; };
+		32CC64493094C22700AC64AF /* X11Logo.svg */ = {isa = PBXFileReference; lastKnownFileType = text; path = X11Logo.svg; sourceTree = "<group>"; };
+		32CC644A3094C22C00AC64AF /* X11LogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X11LogoView.swift; sourceTree = "<group>"; };
+		32CC644C3094C30000AC64AF /* X11Logo.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = X11Logo.icns; sourceTree = "<group>"; };
+		32CC644D3094C33700AC64AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		000000000000000130000000 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			files = (
+			);
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		000000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				327C4BA43090EAD5008E9508 /* MouseInputMonitor.swift */,
+				327C4BA03090E96A008E9508 /* InteractiveMouse */,
+				320318113090CBEA00111A9D /* SharkControlApp.swift */,
+				320318123090CC1700111A9D /* SharkControlApp.swift */,
+				3203180A3090C7A800111A9D /* DeviceTransport.swift */,
+				320318093090C7A800111A9D /* HIDDeviceScanner.swift */,
+				320317FF3090C73900111A9D /* Protocol */,
+				320318023090C73900111A9D /* Services */,
+				320318053090C73900111A9D /* Views */,
+				000000000000000000000020 /* Products */,
+				327C4B983090D98B008E9508 /* ViewModels */,
+				32CC64483094C22700AC64AF /* Assets */,
+				32CC644D3094C33700AC64AF /* Assets.xcassets */,
+			);
+			sourceTree = "<group>";
+		};
+		000000000000000000000020 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				000000000000000000000120 /* X11 Software.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		320317FF3090C73900111A9D /* Protocol */ = {
+			isa = PBXGroup;
+			children = (
+				320317FE3090C73900111A9D /* ProtocolDefinitions.swift */,
+				327C4BD03090F200008E9508 /* DPICodec.swift */,
+			);
+			path = Protocol;
+			sourceTree = "<group>";
+		};
+		320318023090C73900111A9D /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				320318003090C73900111A9D /* DeviceTransport.swift */,
+				320318013090C73900111A9D /* HIDDeviceScanner.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		320318053090C73900111A9D /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				327C4BA8309108E2008E9508 /* InteractiveMouseTestView.swift */,
+				327C4BC03090F100008E9508 /* ConfigPanelView.swift */,
+				327C4B9D3090E300008E9508 /* MouseDashboardView.swift */,
+				3203180F3090C9DB00111A9D /* ContentView.swift */,
+				32CC644A3094C22C00AC64AF /* X11LogoView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+		327C4B983090D98B008E9508 /* ViewModels */ = {
+			isa = PBXGroup;
+			children = (
+				327C4B993090D991008E9508 /* DeviceViewModel.swift */,
+			);
+			path = ViewModels;
+			sourceTree = "<group>";
+		};
+		327C4BA03090E96A008E9508 /* InteractiveMouse */ = {
+			isa = PBXGroup;
+			children = (
+				327C4BA23090E993008E9508 /* MouseInputMonitor.swift */,
+				327C4BB43090F000008E9508 /* MouseVisualizerView.swift */,
+				327C4BB23090F000008E9508 /* MouseSVG.swift */,
+				327C4BB03090F000008E9508 /* LegacyMouseInputMonitor.swift */,
+			);
+			path = InteractiveMouse;
+			sourceTree = "<group>";
+		};
+		32CC64483094C22700AC64AF /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				32CC64493094C22700AC64AF /* X11Logo.svg */,
+				32CC644C3094C30000AC64AF /* X11Logo.icns */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		000000000000000100000000 /* MyApp */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 000000000000000110000000 /* Build configuration list for PBXNativeTarget "MyApp" */;
+			buildPhases = (
+				000000000000000120000000 /* Sources */,
+				000000000000000130000000 /* Frameworks */,
+				000000000000000140000000 /* Resources */,
+			);
+			buildRules = (
+			);
+			name = MyApp;
+			productName = MyApp;
+			productReference = 000000000000000000000120 /* X11 Software.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		000000000000000000000000 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2630;
+				LastUpgradeCheck = 2700;
+				TargetAttributes = {
+					000000000000000100000000 = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
+			};
+			buildConfigurationList = 000000000000000010000000 /* Build configuration list for PBXProject "SharkControl" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 000000000000000000000001;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 90;
+			productRefGroup = 000000000000000000000020 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				000000000000000100000000 /* MyApp */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		000000000000000140000000 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			files = (
+				32CC644E3094C33700AC64AF /* Assets.xcassets in Resources */,
+			);
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		000000000000000120000000 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			files = (
+				327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */,
+				327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */,
+				32CC644B3094C22C00AC64AF /* X11LogoView.swift in Sources */,
+				327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */,
+				327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */,
+				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
+				320318133090CC1700111A9D /* SharkControlApp.swift in Sources */,
+				32126A6F30925D58004A76CC /* (null) in Sources */,
+				320318073090C73900111A9D /* HIDDeviceScanner.swift in Sources */,
+				320318063090C73900111A9D /* DeviceTransport.swift in Sources */,
+				327C4BA9309108E8008E9508 /* InteractiveMouseTestView.swift in Sources */,
+				320318103090C9DB00111A9D /* ContentView.swift in Sources */,
+				320318083090C73900111A9D /* ProtocolDefinitions.swift in Sources */,
+				327C4BD13090F200008E9508 /* DPICodec.swift in Sources */,
+				327C4B9E3090E301008E9508 /* MouseDashboardView.swift in Sources */,
+				327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */,
+			);
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		000000000000000011000000 /* Debug configuration for PBXProject "SharkControl" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.6.2;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PROJECT_UNIQUE_VALUE = USIUN7DL;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Debug;
+		};
+		000000000000000012000000 /* Release configuration for PBXProject "SharkControl" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DRIVERKIT_DEPLOYMENT_TARGET = 27.0;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 27.0;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 26.6.2;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PROJECT_UNIQUE_VALUE = USIUN7DL;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				TVOS_DEPLOYMENT_TARGET = 27.0;
+				WATCHOS_DEPLOYMENT_TARGET = 27.0;
+				XROS_DEPLOYMENT_TARGET = 27.0;
+			};
+			name = Release;
+		};
+		000000000000000111000000 /* Debug configuration for PBXNativeTarget "MyApp" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "X11 Software";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "X11 Software";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Debug;
+		};
+		000000000000000112000000 /* Release configuration for PBXNativeTarget "MyApp" */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_APP_SANDBOX = YES;
+				ENABLE_INCOMING_NETWORK_CONNECTIONS = NO;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = NO;
+				ENABLE_RESOURCE_ACCESS_BLUETOOTH = NO;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = NO;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = NO;
+				ENABLE_RESOURCE_ACCESS_LOCATION = NO;
+				ENABLE_RESOURCE_ACCESS_PRINTING = NO;
+				ENABLE_RESOURCE_ACCESS_USB = YES;
+				ENABLE_USER_SELECTED_FILES = readonly;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "X11 Software";
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphoneos*]" = YES;
+				"INFOPLIST_KEY_UILaunchScreen_Generation[sdk=iphonesimulator*]" = YES;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphoneos*]" = UIStatusBarStyleDefault;
+				"INFOPLIST_KEY_UIStatusBarStyle[sdk=iphonesimulator*]" = UIStatusBarStyleDefault;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
+				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
+				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
+				PRODUCT_NAME = "X11 Software";
+				REGISTER_APP_GROUPS = YES;
+				SDKROOT = auto;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		000000000000000010000000 /* Build configuration list for PBXProject "SharkControl" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000011000000 /* Debug configuration for PBXProject "SharkControl" */,
+				000000000000000012000000 /* Release configuration for PBXProject "SharkControl" */,
+			);
+			defaultConfigurationName = Release;
+		};
+		000000000000000110000000 /* Build configuration list for PBXNativeTarget "MyApp" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				000000000000000111000000 /* Debug configuration for PBXNativeTarget "MyApp" */,
+				000000000000000112000000 /* Release configuration for PBXNativeTarget "MyApp" */,
+			);
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 000000000000000000000000 /* Project object */;
+}

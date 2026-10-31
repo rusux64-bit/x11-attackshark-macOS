@@ -25,7 +25,7 @@ private struct ConnectionStatusView: View {
                 .foregroundColor(.secondary)
                 .symbolEffect(.pulse)
             
-            Text("SharkControl")
+            Text("X11 Software")
                 .font(.largeTitle)
                 .fontWeight(.bold)
             

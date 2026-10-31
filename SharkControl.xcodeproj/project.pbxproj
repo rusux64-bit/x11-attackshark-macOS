@@ -22,12 +22,15 @@
 		327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BB43090F000008E9508 /* MouseVisualizerView.swift */; };
 		327C4BC13090F100008E9508 /* ConfigPanelView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BC03090F100008E9508 /* ConfigPanelView.swift */; };
 		327C4BD13090F200008E9508 /* DPICodec.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BD03090F200008E9508 /* DPICodec.swift */; };
-		327C4BE33090F300008E9508 /* BatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BE23090F300008E9508 /* BatteryNotifier.swift */; };
+		32CC644B3094C22C00AC64AF /* X11LogoView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 32CC644A3094C22C00AC64AF /* X11LogoView.swift */; };
+		32CC644E3094C33700AC64AF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 32CC644D3094C33700AC64AF /* Assets.xcassets */; };
+		32CC64503094C60100AC64AF /* X11AppIcon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 32CC644F3094C60000AC64AF /* X11AppIcon.icon */; };
 		327C4BE13090F300008E9508 /* WindowResizeMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BE03090F300008E9508 /* WindowResizeMonitor.swift */; };
+		327C4BE33090F300008E9508 /* BatteryNotifier.swift in Sources */ = {isa = PBXBuildFile; fileRef = 327C4BE23090F300008E9508 /* BatteryNotifier.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		000000000000000000000120 /* MyApp.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyApp.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		000000000000000000000120 /* X11 Software.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "X11 Software.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		320317FE3090C73900111A9D /* ProtocolDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProtocolDefinitions.swift; sourceTree = "<group>"; };
 		320318003090C73900111A9D /* DeviceTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceTransport.swift; sourceTree = "<group>"; };
 		320318013090C73900111A9D /* HIDDeviceScanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HIDDeviceScanner.swift; sourceTree = "<group>"; };
@@ -46,8 +49,13 @@
 		327C4BB43090F000008E9508 /* MouseVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MouseVisualizerView.swift; sourceTree = "<group>"; };
 		327C4BC03090F100008E9508 /* ConfigPanelView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigPanelView.swift; sourceTree = "<group>"; };
 		327C4BD03090F200008E9508 /* DPICodec.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DPICodec.swift; sourceTree = "<group>"; };
-		327C4BE23090F300008E9508 /* BatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryNotifier.swift; sourceTree = "<group>"; };
+		32CC64493094C22700AC64AF /* X11Logo.svg */ = {isa = PBXFileReference; lastKnownFileType = text; path = X11Logo.svg; sourceTree = "<group>"; };
+		32CC644A3094C22C00AC64AF /* X11LogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = X11LogoView.swift; sourceTree = "<group>"; };
+		32CC644C3094C30000AC64AF /* X11Logo.icns */ = {isa = PBXFileReference; lastKnownFileType = image.icns; path = X11Logo.icns; sourceTree = "<group>"; };
+		32CC644D3094C33700AC64AF /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		32CC644F3094C60000AC64AF /* X11AppIcon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = X11AppIcon.icon; sourceTree = "<group>"; };
 		327C4BE03090F300008E9508 /* WindowResizeMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowResizeMonitor.swift; sourceTree = "<group>"; };
+		327C4BE23090F300008E9508 /* BatteryNotifier.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatteryNotifier.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -73,13 +81,15 @@
 				320318053090C73900111A9D /* Views */,
 				000000000000000000000020 /* Products */,
 				327C4B983090D98B008E9508 /* ViewModels */,
+				32CC64483094C22700AC64AF /* Assets */,
+				32CC644D3094C33700AC64AF /* Assets.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
 		000000000000000000000020 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				000000000000000000000120 /* MyApp.app */,
+				000000000000000000000120 /* X11 Software.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -111,6 +121,7 @@
 				327C4BC03090F100008E9508 /* ConfigPanelView.swift */,
 				327C4B9D3090E300008E9508 /* MouseDashboardView.swift */,
 				3203180F3090C9DB00111A9D /* ContentView.swift */,
+				32CC644A3094C22C00AC64AF /* X11LogoView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -134,6 +145,16 @@
 			path = InteractiveMouse;
 			sourceTree = "<group>";
 		};
+		32CC64483094C22700AC64AF /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				32CC64493094C22700AC64AF /* X11Logo.svg */,
+				32CC644C3094C30000AC64AF /* X11Logo.icns */,
+				32CC644F3094C60000AC64AF /* X11AppIcon.icon */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -149,7 +170,7 @@
 			);
 			name = MyApp;
 			productName = MyApp;
-			productReference = 000000000000000000000120 /* MyApp.app */;
+			productReference = 000000000000000000000120 /* X11 Software.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -190,6 +211,8 @@
 		000000000000000140000000 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			files = (
+				32CC644E3094C33700AC64AF /* Assets.xcassets in Resources */,
+				32CC64503094C60100AC64AF /* X11AppIcon.icon in Resources */,
 			);
 		};
 /* End PBXResourcesBuildPhase section */
@@ -200,6 +223,7 @@
 			files = (
 				327C4BA53090EAD5008E9508 /* MouseInputMonitor.swift in Sources */,
 				327C4BB53090F000008E9508 /* MouseVisualizerView.swift in Sources */,
+				32CC644B3094C22C00AC64AF /* X11LogoView.swift in Sources */,
 				327C4BB33090F000008E9508 /* MouseSVG.swift in Sources */,
 				327C4BB13090F000008E9508 /* LegacyMouseInputMonitor.swift in Sources */,
 				327C4B9A3090D9C2008E9508 /* DeviceViewModel.swift in Sources */,
@@ -355,6 +379,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "MyApp" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = X11AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
@@ -371,6 +396,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "X11 Software";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -385,7 +411,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "X11 Software";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -402,6 +428,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "MyApp" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = X11AppIcon;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_APP_SANDBOX = YES;
@@ -418,6 +445,7 @@
 				ENABLE_RESOURCE_ACCESS_USB = YES;
 				ENABLE_USER_SELECTED_FILES = readonly;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "X11 Software";
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphoneos*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSceneManifest_Generation[sdk=iphonesimulator*]" = YES;
 				"INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents[sdk=iphoneos*]" = YES;
@@ -432,7 +460,7 @@
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "devplaceholder.$(PROJECT_UNIQUE_VALUE:identifier).$(PRODUCT_NAME:rfc1034identifier)";
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = "X11 Software";
 				REGISTER_APP_GROUPS = YES;
 				SDKROOT = auto;
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;

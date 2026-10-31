@@ -65,10 +65,16 @@ public struct MouseDashboardView: View {
                 .cornerRadius(8)
                 }
 
-                Text("Attack Shark X11")
-                    .font(.headline)
-                    .fontWeight(.semibold)
-                    .accessibilityAddTraits(.isHeader)
+                HStack(spacing: 8) {
+                    X11LogoView()
+                        .frame(width: 26, height: 26)
+
+                    Text("X11 Software")
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityAddTraits(.isHeader)
             }
             .padding(20)
             
@@ -93,9 +99,7 @@ public struct MouseDashboardView: View {
     /// Narrow panel with the SVG mouse that lights up on physical clicks / scrolling.
     private var livePanel: some View {
         ZStack {
-            RoundedRectangle(cornerRadius: 24)
-                .fill(isDarkMode ? Color.black.opacity(0.4) : Color.white)
-                .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 5)
+            PanelBackground(isDark: isDarkMode)
             
             VStack(spacing: 15) {
                 Text("Live Test")
