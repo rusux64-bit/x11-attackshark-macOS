@@ -41,14 +41,14 @@ jobs:
             -project SharkControl.xcodeproj \
             -target MyApp \
             -configuration Release \
-            -derivedDataPath build \
+            SYMROOT="$PWD/build" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY=""
 
       - name: Package app into DMG
         run: |
-          APP="build/Build/Products/Release/MyApp.app"
+          APP="build/Release/MyApp.app"
           if [ ! -d "$APP" ]; then
             echo "Built app not found at $APP"
             exit 1
