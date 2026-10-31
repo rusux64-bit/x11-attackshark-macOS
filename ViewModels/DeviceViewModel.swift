@@ -20,6 +20,7 @@ public struct DPIStageEdit {
 public enum DPISyncState: Equatable {
     case noMouse
     case searching
+    case reading
     case synced
     case writing
     case unverified
@@ -29,6 +30,7 @@ public enum DPISyncState: Equatable {
         switch self {
         case .noMouse: "No mouse connected"
         case .searching: "Connecting to the mouse…"
+        case .reading: "Reading from mouse…"
         case .synced: "Synced with mouse"
         case .writing: "Sending to mouse…"
         case .unverified: "Sent · mouse didn't confirm"
@@ -270,20 +272,46 @@ public final class DeviceViewModel: ObservableObject {
         }
     }
 
-    /// Reads the DPI setup from the mouse again and publishes it (also used by the ↻ button).
-    public func refreshDPI() {
-        guard isConnected else { return }
-        guard let transport = configTransport else {
-            scheduleProbe(after: 0)
+    /// Reads the DPI setup from the mouse again and publishes it.
+    /// `userInitiated` is the ↻ button: it shows "Reading from mouse…" and retries once if the mouse is slow.
+    /// `completion` receives what was read from the mouse, or nil if nothing could be read.
+    public func refreshDPI(userInitiated: Bool = false, completion: ((DPIConfiguration?) -> Void)? = nil) {
+        guard isConnected else {
+            completion?(nil)
             return
         }
-        guard dpiSyncState != .writing else { return }
+        guard let transport = configTransport else {
+            // No endpoint found yet: search again (a successful probe also loads the DPI setup).
+            scheduleProbe(after: 0)
+            completion?(nil)
+            return
+        }
+        guard dpiSyncState != .writing else {
+            completion?(nil)
+            return
+        }
 
         refreshTask?.cancel()
-        refreshTask = Task { [weak self] in
+        if userInitiated { dpiSyncState = .reading }
+
+        refreshTask = Task { @MainActor [weak self] in
             guard let self else { return }
-            let configuration = await self.onHIDQueue { transport.readDPIConfiguration() }
-            guard !Task.isCancelled, self.configTransport === transport else { return }
+            let started = Date()
+            let configuration = await self.onHIDQueue { () -> DPIConfiguration? in
+                if let first = transport.readDPIConfiguration() { return first }
+                guard userInitiated else { return nil }
+                usleep(150_000)   // a sleeping wireless mouse often answers the second try
+                return transport.readDPIConfiguration()
+            }
+            if userInitiated {
+                // Keep the "reading" feedback visible long enough to be noticed.
+                let elapsed = Date().timeIntervalSince(started)
+                if elapsed < 0.45 { try? await Task.sleep(for: .seconds(0.45 - elapsed)) }
+            }
+            guard !Task.isCancelled, self.configTransport === transport else {
+                completion?(nil)
+                return
+            }
             if let configuration {
                 self.dpiBase = configuration
                 self.mouseDPIConfiguration = configuration
@@ -291,6 +319,7 @@ public final class DeviceViewModel: ObservableObject {
             } else {
                 self.dpiSyncState = .failed("Mouse isn't answering — move it to wake it up")
             }
+            completion?(configuration)
         }
     }
 

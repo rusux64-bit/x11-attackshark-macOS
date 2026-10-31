@@ -197,6 +197,8 @@ final class ConfigState: ObservableObject {
     private var hasPendingLocalEdits = false
     private var isApplyingMouse = false
     private var isWriting = false
+    /// True while the ↻ button is reading the mouse; edits made in the meantime are discarded, not sent.
+    private var isSyncingFromMouse = false
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -222,13 +224,25 @@ final class ConfigState: ObservableObject {
             .store(in: &cancellables)
     }
 
+    /// ↻ button: drops unsent edits and loads whatever the mouse holds right now.
+    func syncFromMouse() {
+        guard let device, !isWriting, !isSyncingFromMouse else { return }
+        hasPendingLocalEdits = false
+        isSyncingFromMouse = true
+        device.refreshDPI(userInitiated: true) { [weak self] configuration in
+            guard let self else { return }
+            self.isSyncingFromMouse = false
+            if let configuration { self.applyMouse(configuration) }
+        }
+    }
+
     private func noteLocalChange(stages: [DPIStageState], active: Int) {
         guard !isApplyingMouse, let known = deviceSignature else { return }
         if Self.signature(stages: stages, active: active) != known { hasPendingLocalEdits = true }
     }
 
     private func pushDPIIfNeeded() {
-        guard !isApplyingMouse, !isWriting else { return }
+        guard !isApplyingMouse, !isWriting, !isSyncingFromMouse else { return }
         guard let device, let known = deviceSignature else {
             hasPendingLocalEdits = false
             return
@@ -894,10 +908,17 @@ private struct SyncBadge: View {
     private var tint: Color {
         switch state {
         case .synced: .green
-        case .searching, .writing: .accentColor
+        case .searching, .reading, .writing: .accentColor
         case .unverified: .yellow
         case .noMouse: .secondary
         case .failed: .orange
+        }
+    }
+
+    private var isBusy: Bool {
+        switch state {
+        case .searching, .reading, .writing: true
+        default: false
         }
     }
 
@@ -912,13 +933,17 @@ private struct SyncBadge: View {
             Button(action: onRefresh) {
                 Image(systemName: "arrow.clockwise")
                     .font(.system(size: 11, weight: .semibold))
+                    .symbolEffect(.pulse, isActive: isBusy)
+                    .padding(4)
                     .contentShape(Rectangle())
             }
             .buttonStyle(PressableStyle())
-            .help("Read the DPI settings from the mouse again")
+            .disabled(isBusy || state == .noMouse)
+            .help("Sync: read the DPI settings from the mouse now")
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 5)
+        .padding(.leading, 10)
+        .padding(.trailing, 6)
+        .padding(.vertical, 3)
         .background(Capsule().fill(Color.primary.opacity(0.07)))
         .animation(.easeInOut(duration: 0.2), value: state)
     }
@@ -954,7 +979,7 @@ private struct DPIPage: View {
 
                 Spacer(minLength: 8)
 
-                SyncBadge(state: device.dpiSyncState) { device.refreshDPI() }
+                SyncBadge(state: device.dpiSyncState) { state.syncFromMouse() }
             }
 
             VStack(spacing: 6) {
