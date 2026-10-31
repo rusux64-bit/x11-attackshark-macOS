@@ -790,10 +790,12 @@ final class ConfigState: ObservableObject {
             return
         }
         guard hasReading else { return }
-        if charging || Double(level) > threshold {
-            batteryAlertSent = false   // recovered: the next drop alerts again
+        if charging || Double(level) > threshold + 2 {
+            batteryAlertSent = false   // recovered (with a 2% margin): the next drop alerts again
             return
         }
+        // Between the threshold and threshold + 2: neither alert nor re-arm, so 20% <-> 21% can't ring twice.
+        if Double(level) > threshold { return }
         guard !batteryAlertSent else { return }
         batteryAlertSent = true
         BatteryNotifier.shared.notifyLowBattery(level: level)

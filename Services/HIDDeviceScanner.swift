@@ -112,6 +112,9 @@ public final class HIDDeviceScanner {
             context.bufferSize,
             { ctx, result, sender, type, reportID, report, reportLength in
                 guard let ctx = ctx else { return }
+                // The mouse sends ~1000 movement reports per second. Only battery heartbeats and DPI events matter,
+                // so everything else is dropped here, before allocating or touching the main thread.
+                guard HIDDeviceScanner.isRelevantReport(report, length: reportLength, reportID: reportID) else { return }
                 let ep = Unmanaged<EndpointContext>.fromOpaque(ctx).takeUnretainedValue()
                 let data = Data(bytes: report, count: reportLength)
                 ep.scanner?.handleInputReport(data: data, reportID: reportID, device: ep.device)
@@ -125,9 +128,18 @@ public final class HIDDeviceScanner {
     }
     
     private func handleInputReport(data: Data, reportID: UInt32, device: IOHIDDevice) {
-        DispatchQueue.main.async {
-            self.onInputReport?(data, reportID, device)
+        // Already running on the main run loop (the manager is scheduled on it): no extra hop needed.
+        onInputReport?(data, reportID, device)
+    }
+
+    /// Cheap pre-filter, same layouts the view model parses: `03 55 <event> ...` (battery) or `03 <model> <evDPI> ...`.
+    /// The report ID byte may or may not be part of the buffer.
+    private static func isRelevantReport(_ report: UnsafePointer<UInt8>, length: Int, reportID: UInt32) -> Bool {
+        guard length >= 4 else { return false }
+        if report[0] == 0x03 {
+            return report[1] == 0x55 || report[2] == ProtocolConstants.evDPI
         }
+        return report[0] == 0x55 || (reportID == 0x03 && report[1] == ProtocolConstants.evDPI)
     }
     
     private func detachDevice(_ device: IOHIDDevice) {

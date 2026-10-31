@@ -159,6 +159,7 @@ public final class DeviceViewModel: ObservableObject {
             self.isCharging = false
             self.hasBatteryReading = false
             self.lastHeartbeat = nil
+            self.resetBatterySmoothing()
 
             self.probeTask?.cancel()
             self.refreshTask?.cancel()
@@ -216,15 +217,86 @@ public final class DeviceViewModel: ObservableObject {
         let state = b[3]
         let level = min(Int(b[4]), 100)
         lastHeartbeat = Date()
-        batteryLevel = level
-        hasBatteryReading = true
         reportedCharging = (state == ProtocolConstants.chargingFlag)
         refreshConnectionState()
+        // The mouse's percentage is a noisy voltage estimate: show a steady value instead of the raw one.
+        batteryLevel = smoothedBattery(raw: level, charging: isCharging)
+        hasBatteryReading = true
 
         if lastLogged?.state != state || lastLogged?.level != level {
             lastLogged = (state, level)
-            print("🔋 battery \(level)% state=0x\(String(format: "%02X", state)) wired=\(isWiredConnection) charging=\(isCharging)")
+            print("🔋 battery raw \(level)% shown \(batteryLevel)% state=0x\(String(format: "%02X", state)) wired=\(isWiredConnection) charging=\(isCharging)")
         }
+    }
+
+    // MARK: - Battery smoothing
+
+    private var batteryWindow: [Int] = []
+    private var shownLevel: Int?
+    private var lastLevelStep = Date.distantPast
+    private var lastBatterySample = Date.distantPast
+    private var lastBatteryCharging: Bool?
+    private var wrongDirectionCount = 0
+    /// The shown value moves by at most 1% per this many seconds.
+    private static let batteryStepInterval: TimeInterval = 15
+
+    private func resetBatterySmoothing() {
+        batteryWindow.removeAll()
+        shownLevel = nil
+        lastBatteryCharging = nil
+        wrongDirectionCount = 0
+        lastLevelStep = .distantPast
+    }
+
+    /// Median of the last readings, then:
+    /// - on cable the reported % (about 100%) is ignored and the last level read on battery stays shown;
+    /// - on battery the shown value never goes up;
+    /// - it moves toward the target by 1% at a time, at most every 15 s, so it can't jump 70 -> 77.
+    /// A long silence (10 min) or a disconnect starts again from the raw value.
+    private func smoothedBattery(raw: Int, charging: Bool) -> Int {
+        let now = Date()
+        if now.timeIntervalSince(lastBatterySample) > 600 { resetBatterySmoothing() }
+        lastBatterySample = now
+
+        if lastBatteryCharging != charging {
+            // Plugging / unplugging changes the voltage: don't mix readings from before and after.
+            batteryWindow.removeAll()
+            wrongDirectionCount = 0
+            // Just unplugged: the reading is the real battery again, so start from it (no slow climb down from 100%).
+            if lastBatteryCharging == true && !charging { shownLevel = nil }
+            lastBatteryCharging = charging
+        }
+        if charging {
+            // Over the cable the mouse reports ~100% whatever its real charge is, so that reading is not shown:
+            // keep the last level read on battery (the charging icon tells the rest).
+            if let shown = shownLevel { return shown }
+            shownLevel = raw   // the app started while plugged in: nothing better to show
+            return raw
+        }
+        batteryWindow.append(raw)
+        if batteryWindow.count > 7 { batteryWindow.removeFirst() }
+        let median = batteryWindow.sorted()[batteryWindow.count / 2]
+
+        guard let shown = shownLevel else {
+            shownLevel = raw
+            lastLevelStep = now
+            return raw
+        }
+
+        var target = median
+        if target > shown {
+            wrongDirectionCount += 1
+            // Only accept a big, lasting disagreement (e.g. the mouse was charged while the app wasn't watching).
+            if !(wrongDirectionCount >= 20 && abs(target - shown) >= 5) { target = shown }
+        } else {
+            wrongDirectionCount = 0
+        }
+
+        guard target != shown, now.timeIntervalSince(lastLevelStep) >= Self.batteryStepInterval else { return shown }
+        lastLevelStep = now
+        let next = shown + (target > shown ? 1 : -1)
+        shownLevel = next
+        return next
     }
 
     // MARK: - DPI sync

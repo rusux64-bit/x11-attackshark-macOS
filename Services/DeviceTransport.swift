@@ -31,6 +31,24 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
     public let hidDevice: IOHIDDevice
     /// IOReturn code of the last refused write (nil after a successful one). Shown in the UI to help diagnose.
     public private(set) var lastFailure: String?
+    /// Report length (with report ID) that the mouse accepted when the plain length was refused.
+    private var workingLength: [UInt8: Int] = [:]
+
+    private static func padded(_ bytes: [UInt8], to length: Int?) -> [UInt8] {
+        guard let length, length > bytes.count else { return bytes }
+        return bytes + [UInt8](repeating: 0, count: length - bytes.count)
+    }
+
+    /// What the mouse's HID descriptor declares for the feature report with this ID (diagnostics only).
+    public func featureElementsSummary(reportID: UInt8) -> String {
+        guard let elements = IOHIDDeviceCopyMatchingElements(hidDevice, nil, IOOptionBits(kIOHIDOptionsTypeNone)) as? [IOHIDElement] else {
+            return "unavailable"
+        }
+        let parts = elements
+            .filter { IOHIDElementGetType($0) == kIOHIDElementTypeFeature && IOHIDElementGetReportID($0) == UInt32(reportID) }
+            .map { "\(IOHIDElementGetReportSize($0))bit x\(IOHIDElementGetReportCount($0))" }
+        return parts.isEmpty ? "no feature element with this ID" : parts.joined(separator: ", ")
+    }
 
     public init(hidDevice: IOHIDDevice) {
         self.hidDevice = hidDevice
@@ -46,7 +64,24 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
             }
         }
 
-        var result = attempt(data)
+        var result = attempt(Self.padded(data, to: workingLength[reportID]))
+
+        if result != kIOReturnSuccess, reportID != ProtocolConstants.reportReadReq {
+            // The HID descriptor may declare this report longer than the bytes we send. A control transfer of the wrong
+            // length is stalled by the mouse (USB error 0xe0005000), typically only over the cable. Try longer lengths,
+            // padded with zeros, and remember the one that works.
+            let declaredMax = (IOHIDDeviceGetProperty(hidDevice, "MaxFeatureReportSize" as CFString) as? Int) ?? 64
+            let cap = min(max(declaredMax + 1, data.count + 1), 130)
+            var length = data.count + 1
+            while length <= cap, result != kIOReturnSuccess {
+                result = attempt(Self.padded(data, to: length))
+                if result == kIOReturnSuccess {
+                    workingLength[reportID] = length
+                    print("ℹ️ Report 0x\(String(format: "%02X", reportID)) accepted with length \(length) (plain length was \(data.count))")
+                }
+                length += 1
+            }
+        }
 
         // Config writes (not the 0xA0 read request) are retried: right after a read request the mouse can still be
         // busy and rejects the write, which over the cable shows up as a USB error (0xe0005000).
@@ -188,7 +223,7 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
             return ok
         }
         if !sent && !alternates.isEmpty {
-            print("❌ Lighting report refused by every HID endpoint: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+            print("❌ Lighting report refused by every HID endpoint: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))  descriptor for 0x05: \(featureElementsSummary(reportID: ProtocolConstants.reportLight))")
         }
         guard sent else {
             return .failed("Mouse refused the lighting report (USB error \(lastFailure ?? "unknown"))")

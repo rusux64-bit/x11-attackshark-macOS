@@ -74,8 +74,15 @@ struct MouseVisualizerView: NSViewRepresentable {
         private var pendingPressed: Set<MouseControl> = []
         var theme = true
 
+        // Live window resize: the SVG is swapped for a static snapshot while the user drags the window edge,
+        // so WebKit doesn't have to re-render two large SVG layers on every frame.
+        private var resizeObservers: [NSObjectProtocol] = []
+        private var snapshotView: NSImageView?
+        private var isLiveResizing = false
+
         func attach(to web: WKWebView, zone: MouseTestZone?) {
             self.web = web
+            observeLiveResize()
             if let zone {
                 monitor.acceptsLocation = { [weak zone] p in zone?.contains(screenPoint: p) ?? false }
             }
@@ -91,6 +98,54 @@ struct MouseVisualizerView: NSViewRepresentable {
             monitor.stop()
             monitor.onPressedChange = nil
             monitor.onScrollStep = nil
+            resizeObservers.forEach { NotificationCenter.default.removeObserver($0) }
+            resizeObservers.removeAll()
+            snapshotView?.removeFromSuperview()
+            snapshotView = nil
+        }
+
+        // MARK: Live resize
+
+        private func observeLiveResize() {
+            guard resizeObservers.isEmpty else { return }
+            let center = NotificationCenter.default
+            resizeObservers.append(center.addObserver(forName: NSWindow.willStartLiveResizeNotification, object: nil, queue: .main) { [weak self] note in
+                guard let self, let window = note.object as? NSWindow, window === self.web?.window else { return }
+                self.beginLiveResize()
+            })
+            resizeObservers.append(center.addObserver(forName: NSWindow.didEndLiveResizeNotification, object: nil, queue: .main) { [weak self] note in
+                guard let self, let window = note.object as? NSWindow, window === self.web?.window else { return }
+                self.endLiveResize()
+            })
+        }
+
+        private func beginLiveResize() {
+            guard pageLoaded, !isLiveResizing, let web else { return }
+            isLiveResizing = true
+            web.takeSnapshot(with: WKSnapshotConfiguration()) { [weak self, weak web] image, _ in
+                guard let self, let web, let image, self.isLiveResizing, self.snapshotView == nil else { return }
+                let overlay = NSImageView(frame: web.bounds)
+                overlay.image = image
+                overlay.imageScaling = .scaleProportionallyUpOrDown
+                overlay.autoresizingMask = [.width, .height]
+                web.addSubview(overlay)
+                self.snapshotView = overlay
+                web.evaluateJavaScript("document.body.style.visibility='hidden'")
+            }
+        }
+
+        private func endLiveResize() {
+            guard isLiveResizing else { return }
+            isLiveResizing = false
+            guard let overlay = snapshotView else { return }
+            snapshotView = nil
+            guard let web else {
+                overlay.removeFromSuperview()
+                return
+            }
+            web.evaluateJavaScript("document.body.style.visibility='visible'") { _, _ in
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { overlay.removeFromSuperview() }
+            }
         }
 
         func setTheme(dark: Bool) {
