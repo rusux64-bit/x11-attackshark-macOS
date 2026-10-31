@@ -11,6 +11,8 @@ public nonisolated enum ProtocolError: Error, Equatable {
     case invalidStageCount(Int)
     case noEnabledDPIStage
     case invalidActiveStage(Int)
+    case invalidPollingCode(UInt8)
+    case invalidDebounce(Int)
 }
 
 public nonisolated struct DPIColor: Equatable, Sendable {

@@ -1,6 +1,13 @@
 import Foundation
 import IOKit.hid
 
+/// Outcome of writing the Performance settings.
+public nonisolated enum PerformanceWriteResult: Sendable {
+    case failed(String)
+    /// Everything that had to be sent was sent. The snapshot is the read-back (nil if the mouse didn't answer it).
+    case written(PerformanceSnapshot?)
+}
+
 /// Talks to ONE HID endpoint of the mouse.
 ///
 /// Everything here is synchronous and can block for a few hundred milliseconds (the mouse answers a read
@@ -95,5 +102,85 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
             print("⚠️ DPI report did not decode: \(error)")
             return nil
         }
+    }
+
+    /// Reads and decodes the polling report (0x06).
+    public func readPollingRate() -> PollingRate? {
+        guard let report = readReport(reportID: ProtocolConstants.reportPolling) else { return nil }
+        do {
+            return try PollingProtocol.decode(report)
+        } catch {
+            print("⚠️ Polling report did not decode: \(error)")
+            return nil
+        }
+    }
+
+    /// Reads and decodes the lighting/power report (0x05), which also carries the debounce time.
+    public func readSystemSettings() -> SystemSettingsReport? {
+        guard let report = readReport(reportID: ProtocolConstants.reportLight) else { return nil }
+        do {
+            return try SystemSettingsReport(decoding: report)
+        } catch {
+            print("⚠️ System report did not decode: \(error)")
+            return nil
+        }
+    }
+
+    /// Polling rate + debounce + angle snapping / ripple control, read together. Nil if any of them fails.
+    public func readPerformanceSnapshot() -> PerformanceSnapshot? {
+        guard let polling = readPollingRate(),
+              let system = readSystemSettings(),
+              let dpi = readDPIConfiguration() else { return nil }
+        return PerformanceSnapshot(polling: polling, system: system, dpi: dpi)
+    }
+
+    /// Writes the Performance settings, sending only the reports whose values differ from what the mouse holds.
+    ///
+    /// Every write is read-modify-write against a fresh read, so nothing the tab doesn't edit (DPI stages,
+    /// colours, lighting, sleep timers) can be overwritten with stale values.
+    public func writePerformance(_ target: PerformanceSettings) -> PerformanceWriteResult {
+        guard let rate = PollingRate(rawValue: target.pollingRate) else {
+            return .failed("Unsupported polling rate")
+        }
+        guard SystemSettingsReport.debounceRange.contains(target.debounceMs) else {
+            return .failed("Unsupported debounce time")
+        }
+        guard let current = readPerformanceSnapshot() else {
+            return .failed("Mouse isn't answering — move it to wake it up")
+        }
+        let now = current.settings
+        var sentAnything = false
+
+        if now.pollingRate != target.pollingRate {
+            guard sendFeatureReport(reportID: ProtocolConstants.reportPolling, data: PollingProtocol.encode(rate)) else {
+                return .failed("Couldn't send the polling rate to the mouse")
+            }
+            sentAnything = true
+            usleep(120_000)
+        }
+
+        if now.debounceMs != target.debounceMs {
+            guard let report = try? current.system.settingDebounce(target.debounceMs),
+                  sendFeatureReport(reportID: ProtocolConstants.reportLight, data: report) else {
+                return .failed("Couldn't send the debounce time to the mouse")
+            }
+            sentAnything = true
+            usleep(120_000)
+        }
+
+        if now.angleSnapping != target.angleSnapping || now.rippleControl != target.rippleControl {
+            var configuration = current.dpi
+            configuration.angleSnap = target.angleSnapping
+            configuration.rippleControl = target.rippleControl
+            guard let report = try? DPIProtocol.encode(configuration),
+                  sendFeatureReport(reportID: ProtocolConstants.reportDPI, data: report) else {
+                return .failed("Couldn't send the sensor settings to the mouse")
+            }
+            sentAnything = true
+            usleep(120_000)
+        }
+
+        guard sentAnything else { return .written(current) }
+        return .written(readPerformanceSnapshot())
     }
 }

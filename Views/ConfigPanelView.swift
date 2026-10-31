@@ -167,10 +167,8 @@ final class ConfigState: ObservableObject {
     @Published var activeStage = 1
     @Published var recentColors: [StageColor] = []
 
-    // Performance
+    // Performance (polling rate, debounce, angle snapping and ripple control are read from / written to the mouse)
     @Published var pollingRate = 1000
-    @Published var liftOff = 2
-    @Published var motionSync = true
     @Published var rippleControl = false
     @Published var angleSnapping = false
     @Published var debounceMs: Double = 4
@@ -199,6 +197,13 @@ final class ConfigState: ObservableObject {
     private var isWriting = false
     /// True while the ↻ button is reading the mouse; edits made in the meantime are discarded, not sent.
     private var isSyncingFromMouse = false
+
+    // Performance sync (same scheme as DPI)
+    private var performanceKnown: PerformanceSettings?
+    private var hasPendingPerformanceEdits = false
+    private var isApplyingPerformance = false
+    private var isWritingPerformance = false
+    private var isSyncingPerformance = false
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -212,6 +217,17 @@ final class ConfigState: ObservableObject {
             .debounce(for: .milliseconds(300), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.pushDPIIfNeeded() }
             .store(in: &cancellables)
+
+        let performanceChanges = Publishers.CombineLatest4($pollingRate, $debounceMs, $angleSnapping, $rippleControl).dropFirst()
+        performanceChanges
+            .sink { [weak self] rate, debounce, angle, ripple in
+                self?.notePerformanceChange(Self.performance(rate: rate, debounce: debounce, angle: angle, ripple: ripple))
+            }
+            .store(in: &cancellables)
+        performanceChanges
+            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.pushPerformanceIfNeeded() }
+            .store(in: &cancellables)
     }
 
     /// Connects the DPI state to the mouse: mouse -> UI updates, UI edits -> mouse writes.
@@ -221,6 +237,10 @@ final class ConfigState: ObservableObject {
         device.$mouseDPIConfiguration
             .compactMap { $0 }
             .sink { [weak self] configuration in self?.applyMouse(configuration) }
+            .store(in: &cancellables)
+        device.$mousePerformance
+            .compactMap { $0 }
+            .sink { [weak self] settings in self?.applyMousePerformance(settings) }
             .store(in: &cancellables)
     }
 
@@ -332,6 +352,80 @@ final class ConfigState: ObservableObject {
             },
             active: configuration.activeStage - 1
         )
+    }
+
+    // MARK: Performance sync
+
+    private static func performance(rate: Int, debounce: Double, angle: Bool, ripple: Bool) -> PerformanceSettings {
+        PerformanceSettings(pollingRate: rate, debounceMs: Int(debounce.rounded()), angleSnapping: angle, rippleControl: ripple)
+    }
+
+    private var currentPerformance: PerformanceSettings {
+        Self.performance(rate: pollingRate, debounce: debounceMs, angle: angleSnapping, ripple: rippleControl)
+    }
+
+    /// ↻ button on the Performance page: drops unsent edits and loads what the mouse holds right now.
+    func syncPerformanceFromMouse() {
+        guard let device, !isWritingPerformance, !isSyncingPerformance else { return }
+        hasPendingPerformanceEdits = false
+        isSyncingPerformance = true
+        device.refreshPerformance(userInitiated: true) { [weak self] settings in
+            guard let self else { return }
+            self.isSyncingPerformance = false
+            if let settings { self.applyMousePerformance(settings) }
+        }
+    }
+
+    private func notePerformanceChange(_ settings: PerformanceSettings) {
+        guard !isApplyingPerformance, let known = performanceKnown else { return }
+        if settings != known { hasPendingPerformanceEdits = true }
+    }
+
+    private func pushPerformanceIfNeeded() {
+        guard !isApplyingPerformance, !isWritingPerformance, !isSyncingPerformance else { return }
+        guard let device, let known = performanceKnown else {
+            hasPendingPerformanceEdits = false
+            return
+        }
+        let wanted = currentPerformance
+        guard wanted != known else {
+            hasPendingPerformanceEdits = false
+            return
+        }
+
+        isWritingPerformance = true
+        device.writePerformance(wanted) { [weak self] confirmed in
+            self?.finishPerformanceWrite(sent: wanted, confirmed: confirmed)
+        }
+    }
+
+    private func finishPerformanceWrite(sent: PerformanceSettings, confirmed: PerformanceSettings?) {
+        isWritingPerformance = false
+        hasPendingPerformanceEdits = false
+        if let confirmed { performanceKnown = confirmed }
+
+        if currentPerformance != sent {
+            // The user kept editing while the write was in flight: send the newer state too.
+            hasPendingPerformanceEdits = true
+            pushPerformanceIfNeeded()
+        } else if let confirmed, confirmed != sent {
+            // The mouse disagrees with what we sent: show what it really holds.
+            applyMousePerformance(confirmed)
+        }
+    }
+
+    /// Loads the mouse's Performance settings into the UI (skipped while the user has unsent edits).
+    private func applyMousePerformance(_ settings: PerformanceSettings) {
+        guard !hasPendingPerformanceEdits, !isWritingPerformance else { return }
+        performanceKnown = settings
+        isApplyingPerformance = true
+        defer { isApplyingPerformance = false }
+
+        if pollingRate != settings.pollingRate { pollingRate = settings.pollingRate }
+        let debounce = Double(min(max(settings.debounceMs, 2), 25))
+        if debounceMs != debounce { debounceMs = debounce }
+        if angleSnapping != settings.angleSnapping { angleSnapping = settings.angleSnapping }
+        if rippleControl != settings.rippleControl { rippleControl = settings.rippleControl }
     }
 
     // MARK: DPI logic
@@ -1050,29 +1144,33 @@ private struct DPIPage: View {
 
 private struct PerformancePage: View {
     @ObservedObject var state: ConfigState
+    @ObservedObject var device: DeviceViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Performance", subtitle: "Tracking and report behaviour of the sensor.")
+            HStack(alignment: .top, spacing: 10) {
+                SectionHeader(title: "Performance", subtitle: "Polling and sensor behaviour. Changes are sent to the mouse as you make them.")
+                Spacer(minLength: 8)
+                SyncBadge(state: device.performanceSyncState) { state.syncPerformanceFromMouse() }
+            }
 
             SettingCard {
                 Text("Polling rate").font(.system(size: 13, weight: .medium))
                 PillSegmented(options: [125, 250, 500, 1000], label: { "\($0) Hz" }, selection: $state.pollingRate)
-                Text("Lift-off distance").font(.system(size: 13, weight: .medium))
-                PillSegmented(options: [1, 2], label: { "\($0) mm" }, selection: $state.liftOff)
             }
 
             SettingCard {
-                ToggleRow(title: "Motion sync", subtitle: "Aligns sensor reports with the polling interval.", isOn: $state.motionSync)
-                Divider()
                 ToggleRow(title: "Ripple control", subtitle: "Smooths movement at high DPI.", isOn: $state.rippleControl)
                 Divider()
                 ToggleRow(title: "Angle snapping", subtitle: "Straightens near-straight lines.", isOn: $state.angleSnapping)
             }
 
             SettingCard {
-                SliderRow(title: "Debounce time", valueText: "\(Int(state.debounceMs)) ms",
-                          value: $state.debounceMs, range: 0...20)
+                SliderRow(title: "Button response time", valueText: "\(Int(state.debounceMs)) ms",
+                          value: $state.debounceMs, range: 2...25)
+                Text("Debounce: lower reacts faster, higher filters accidental double clicks.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
         }
     }
@@ -1231,7 +1329,7 @@ struct ConfigPanelView: View {
     private func page(for tab: ConfigTab) -> some View {
         switch tab {
         case .dpi: DPIPage(state: state, device: device)
-        case .performance: PerformancePage(state: state)
+        case .performance: PerformancePage(state: state, device: device)
         case .buttons: ButtonsPage(state: state)
         case .lighting: LightingPage(state: state)
         case .power: PowerPage(state: state)

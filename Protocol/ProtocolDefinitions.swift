@@ -60,3 +60,137 @@ public nonisolated struct ProtocolHelper {
         return (report[1], report[2], report[3], report[4])
     }
 }
+
+// MARK: - Performance settings
+//
+// Report 0x06 (9 bytes)  polling rate
+// Report 0x05 (15 bytes) lighting + sleep timers + button debounce (byte 10)
+// Report 0x04 (56 bytes) DPI table, which also holds angle snapping (byte 3) and ripple control (byte 4)
+
+public nonisolated enum PollingRate: Int, CaseIterable, Sendable {
+    case hz125 = 125
+    case hz250 = 250
+    case hz500 = 500
+    case hz1000 = 1000
+
+    /// Code the mouse uses for this rate in report 0x06.
+    public var code: UInt8 {
+        switch self {
+        case .hz125: 0x08
+        case .hz250: 0x04
+        case .hz500: 0x02
+        case .hz1000: 0x01
+        }
+    }
+
+    public init?(code: UInt8) {
+        guard let rate = Self.allCases.first(where: { $0.code == code }) else { return nil }
+        self = rate
+    }
+}
+
+public nonisolated enum PollingProtocol {
+    private static let reportLength = 9
+
+    /// `06 09 01 <rate> <0xFF - rate> 00 00 00 00`, e.g. 125 Hz is `06 09 01 08 F7 00 00 00 00`.
+    public static func encode(_ rate: PollingRate) -> [UInt8] {
+        [ProtocolConstants.reportPolling, UInt8(reportLength), 0x01, rate.code, 0xFF - rate.code, 0x00, 0x00, 0x00, 0x00]
+    }
+
+    public static func decode(_ report: [UInt8]) throws -> PollingRate {
+        guard report.count == reportLength else {
+            throw ProtocolError.badLength(expected: reportLength, actual: report.count)
+        }
+        guard report[0] == ProtocolConstants.reportPolling else {
+            throw ProtocolError.unexpectedReportID(expected: ProtocolConstants.reportPolling, actual: report[0])
+        }
+        guard report[1] == UInt8(reportLength) else {
+            throw ProtocolError.invalidReportedLength(expected: UInt8(reportLength), actual: report[1])
+        }
+        guard let rate = PollingRate(code: report[3]) else {
+            throw ProtocolError.invalidPollingCode(report[3])
+        }
+        return rate
+    }
+}
+
+/// Report 0x05 as the mouse reported it. Only the debounce time is changed; every other byte (lighting mode,
+/// colour, brightness, sleep timers) is written back exactly as read, with the checksum recomputed.
+public nonisolated struct SystemSettingsReport: Equatable, Sendable {
+    public static let reportLength = 15
+    /// "Key Response Time" slider of the official app.
+    public static let debounceRange = 2...25
+    private static let debounceOffset = 10
+    private static let checksumOffset = 11
+
+    private let bytes: [UInt8]
+
+    public var debounceMs: Int { Int(bytes[Self.debounceOffset]) }
+
+    public init(decoding report: [UInt8]) throws {
+        guard report.count == Self.reportLength else {
+            throw ProtocolError.badLength(expected: Self.reportLength, actual: report.count)
+        }
+        guard report[0] == ProtocolConstants.reportLight else {
+            throw ProtocolError.unexpectedReportID(expected: ProtocolConstants.reportLight, actual: report[0])
+        }
+        guard report[1] == UInt8(Self.reportLength) else {
+            throw ProtocolError.invalidReportedLength(expected: UInt8(Self.reportLength), actual: report[1])
+        }
+        let expected = ProtocolHelper.checksum(data: Array(report[3..<Self.checksumOffset]))
+        guard Array(report[Self.checksumOffset..<(Self.checksumOffset + 2)]) == expected else {
+            throw ProtocolError.invalidChecksum
+        }
+        bytes = report
+    }
+
+    /// The complete report to send for a new debounce time.
+    public func settingDebounce(_ milliseconds: Int) throws -> [UInt8] {
+        guard Self.debounceRange.contains(milliseconds) else {
+            throw ProtocolError.invalidDebounce(milliseconds)
+        }
+        var report = bytes
+        report[Self.debounceOffset] = UInt8(milliseconds)
+        let checksum = ProtocolHelper.checksum(data: Array(report[3..<Self.checksumOffset]))
+        report[Self.checksumOffset] = checksum[0]
+        report[Self.checksumOffset + 1] = checksum[1]
+        return report
+    }
+}
+
+/// What the Performance tab edits.
+public nonisolated struct PerformanceSettings: Equatable, Sendable {
+    public var pollingRate: Int
+    public var debounceMs: Int
+    public var angleSnapping: Bool
+    public var rippleControl: Bool
+
+    public init(pollingRate: Int, debounceMs: Int, angleSnapping: Bool, rippleControl: Bool) {
+        self.pollingRate = pollingRate
+        self.debounceMs = debounceMs
+        self.angleSnapping = angleSnapping
+        self.rippleControl = rippleControl
+    }
+}
+
+/// The three reports the Performance tab depends on, read together.
+public nonisolated struct PerformanceSnapshot: Sendable {
+    public let polling: PollingRate
+    public let system: SystemSettingsReport
+    public let dpi: DPIConfiguration
+
+    public init(polling: PollingRate, system: SystemSettingsReport, dpi: DPIConfiguration) {
+        self.polling = polling
+        self.system = system
+        self.dpi = dpi
+    }
+
+    public var settings: PerformanceSettings {
+        PerformanceSettings(
+            pollingRate: polling.rawValue,
+            debounceMs: system.debounceMs,
+            angleSnapping: dpi.angleSnap,
+            rippleControl: dpi.rippleControl
+        )
+    }
+}

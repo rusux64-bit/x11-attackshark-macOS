@@ -54,6 +54,14 @@ public final class DeviceViewModel: ObservableObject {
     /// (Not published after our own writes: the UI already holds those values.)
     @Published public private(set) var mouseDPIConfiguration: DPIConfiguration?
 
+    // MARK: Performance sync (polling rate, debounce, angle snapping, ripple control)
+
+    @Published public private(set) var performanceSyncState: DPISyncState = .noMouse
+    /// Performance settings reported by the mouse: first read and manual refresh.
+    /// (Not published after our own writes: the UI already holds those values.)
+    @Published public private(set) var mousePerformance: PerformanceSettings?
+    private var performanceTask: Task<Void, Never>?
+
     /// All blocking HID I/O happens here, one request at a time.
     private let hidQueue = DispatchQueue(label: "SharkControl.hid", qos: .userInitiated)
     /// Every HID endpoint that is attached right now (the mouse exposes several).
@@ -146,10 +154,13 @@ public final class DeviceViewModel: ObservableObject {
 
             self.probeTask?.cancel()
             self.refreshTask?.cancel()
+            self.performanceTask?.cancel()
             self.endpoints.removeAll()
             self.configTransport = nil
             self.dpiBase = nil
             self.mouseDPIConfiguration = nil
+            self.mousePerformance = nil
+            self.performanceSyncState = .noMouse
             self.dpiSyncState = .noMouse
         }
 
@@ -233,7 +244,7 @@ public final class DeviceViewModel: ObservableObject {
 
     private func scheduleProbe(after delay: Double = 0.5, attempt: Int = 0) {
         probeTask?.cancel()
-        probeTask = Task { [weak self] in
+        probeTask = Task { @MainActor [weak self] in
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             guard !Task.isCancelled else { return }
             await self?.probeConfigEndpoint(attempt: attempt)
@@ -241,9 +252,11 @@ public final class DeviceViewModel: ObservableObject {
     }
 
     /// Finds the HID endpoint that answers DPI reads, then loads the mouse's current DPI setup.
+    @MainActor
     private func probeConfigEndpoint(attempt: Int) async {
         guard isConnected, !endpoints.isEmpty else { return }
         dpiSyncState = .searching
+        performanceSyncState = .searching
 
         let transports = probeCandidates().map { DeviceTransport(hidDevice: $0) }
         let found = await onHIDQueue { () -> (Int, DPIConfiguration)? in
@@ -263,12 +276,15 @@ public final class DeviceViewModel: ObservableObject {
             dpiBase = configuration
             mouseDPIConfiguration = configuration
             dpiSyncState = .synced
+            refreshPerformance()
         } else if attempt < 5 {
             // Wireless mice sleep after a while: keep trying, a mouse movement wakes it up.
             dpiSyncState = .failed("Mouse isn't answering — move it to wake it up")
+            performanceSyncState = dpiSyncState
             scheduleProbe(after: 3, attempt: attempt + 1)
         } else {
             dpiSyncState = .failed("Couldn't read the DPI settings — press ↻ to retry")
+            performanceSyncState = .failed("Couldn't read the settings — press ↻ to retry")
         }
     }
 
@@ -320,6 +336,97 @@ public final class DeviceViewModel: ObservableObject {
                 self.dpiSyncState = .failed("Mouse isn't answering — move it to wake it up")
             }
             completion?(configuration)
+        }
+    }
+
+    // MARK: - Performance sync
+
+    /// Reads polling rate, debounce and angle snapping / ripple control from the mouse and publishes them.
+    /// `userInitiated` is the ↻ button: it shows "Reading from mouse…" and retries once if the mouse is slow.
+    /// `completion` receives what was read, or nil if nothing could be read.
+    public func refreshPerformance(userInitiated: Bool = false, completion: ((PerformanceSettings?) -> Void)? = nil) {
+        guard isConnected, let transport = configTransport else {
+            completion?(nil)
+            return
+        }
+        guard performanceSyncState != .writing else {
+            completion?(nil)
+            return
+        }
+
+        performanceTask?.cancel()
+        if userInitiated {
+            performanceSyncState = .reading
+        } else if mousePerformance == nil {
+            performanceSyncState = .searching
+        }
+
+        performanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let started = Date()
+            let snapshot = await self.onHIDQueue { () -> PerformanceSnapshot? in
+                if let first = transport.readPerformanceSnapshot() { return first }
+                guard userInitiated else { return nil }
+                usleep(150_000)
+                return transport.readPerformanceSnapshot()
+            }
+            if userInitiated {
+                let elapsed = Date().timeIntervalSince(started)
+                if elapsed < 0.45 { try? await Task.sleep(for: .seconds(0.45 - elapsed)) }
+            }
+            guard !Task.isCancelled, self.configTransport === transport else {
+                completion?(nil)
+                return
+            }
+            if let snapshot {
+                // angle snapping / ripple control live in the DPI report: keep the write template current.
+                if self.dpiSyncState != .writing { self.dpiBase = snapshot.dpi }
+                self.mousePerformance = snapshot.settings
+                self.performanceSyncState = .synced
+                completion?(snapshot.settings)
+            } else {
+                self.performanceSyncState = .failed("Mouse isn't answering — move it to wake it up")
+                completion?(nil)
+            }
+        }
+    }
+
+    /// Sends the Performance settings chosen in the UI to the mouse, then reads them back to verify.
+    /// `completion` runs on the main thread with the settings now believed to be on the mouse
+    /// (the read-back when available), or nil if nothing could be sent.
+    public func writePerformance(_ target: PerformanceSettings, completion: @escaping (PerformanceSettings?) -> Void) {
+        guard let transport = configTransport else {
+            performanceSyncState = isConnected ? .failed("Not synced with the mouse yet — change not sent") : .noMouse
+            completion(nil)
+            return
+        }
+
+        performanceSyncState = .writing
+        performanceTask?.cancel()
+        performanceTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await self.onHIDQueue { transport.writePerformance(target) }
+
+            guard self.configTransport === transport else {
+                completion(nil)
+                return
+            }
+            switch result {
+            case .failed(let message):
+                self.performanceSyncState = .failed(message)
+                completion(nil)
+            case .written(let snapshot):
+                if let snapshot {
+                    self.dpiBase = snapshot.dpi
+                    self.performanceSyncState = snapshot.settings == target
+                        ? .synced
+                        : .failed("The mouse reported different values than were sent")
+                    completion(snapshot.settings)
+                } else {
+                    self.performanceSyncState = .unverified
+                    completion(target)
+                }
+            }
         }
     }
 
