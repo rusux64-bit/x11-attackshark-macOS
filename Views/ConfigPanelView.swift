@@ -1675,6 +1675,11 @@ private struct LightingPage: View {
                 SyncBadge(state: device.lightingSyncState) { state.syncLightingFromMouse() }
             }
 
+            Label("Lighting mode changes are available only over 2.4G wireless. They are not supported while the mouse is connected by cable.", systemImage: "exclamationmark.triangle.fill")
+                .font(.callout)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+
             SettingCard {
                 Text("Mode").font(.system(size: 13, weight: .medium))
                 // Seven modes don't fit a narrow window in one row: let the row scroll sideways.
