@@ -182,8 +182,73 @@ enum LightMode: String, CaseIterable, Identifiable {
     case steady = "Steady"
     case breathing = "Breathing"
     case rainbow = "Rainbow"
+    case colorBreathing = "Colour breathing"
+    case dpiSteady = "DPI steady"
+    case dpiBreathing = "DPI breathing"
 
     var id: String { rawValue }
+
+    /// The mode code the mouse understands ("Rainbow" is the firmware's "neon" cycle).
+    var hardware: LightingMode {
+        switch self {
+        case .off: .off
+        case .steady: .steady
+        case .breathing: .breathing
+        case .rainbow: .neon
+        case .colorBreathing: .colorBreathing
+        case .dpiSteady: .dpiSteady
+        case .dpiBreathing: .dpiBreathing
+        }
+    }
+
+    init(_ mode: LightingMode) {
+        switch mode {
+        case .off: self = .off
+        case .steady: self = .steady
+        case .breathing: self = .breathing
+        case .neon: self = .rainbow
+        case .colorBreathing: self = .colorBreathing
+        case .dpiSteady: self = .dpiSteady
+        case .dpiBreathing: self = .dpiBreathing
+        }
+    }
+
+    /// Modes that show the colour picked in the app.
+    var usesColor: Bool { self == .steady || self == .breathing }
+    /// Modes that animate, so the speed matters.
+    var usesSpeed: Bool { self == .breathing || self == .rainbow || self == .colorBreathing || self == .dpiBreathing }
+    /// Modes where the LED takes the colour of the active DPI stage.
+    var followsDPIStage: Bool { self == .dpiSteady || self == .dpiBreathing }
+}
+
+/// LED colour as the three bytes the mouse stores, with helpers to go to and from SwiftUI's `Color`.
+enum LEDColor {
+    struct RGB: Hashable {
+        var red: UInt8
+        var green: UInt8
+        var blue: UInt8
+
+        init(_ red: UInt8, _ green: UInt8, _ blue: UInt8) {
+            self.red = red
+            self.green = green
+            self.blue = blue
+        }
+
+        var color: Color {
+            Color(.sRGB, red: Double(red) / 255, green: Double(green) / 255, blue: Double(blue) / 255, opacity: 1)
+        }
+    }
+
+    static let presets: [RGB] = [
+        RGB(255, 0, 0), RGB(255, 128, 0), RGB(255, 255, 0), RGB(0, 255, 0), RGB(0, 255, 255),
+        RGB(0, 0, 255), RGB(160, 0, 255), RGB(255, 0, 128), RGB(255, 255, 255)
+    ]
+
+    static func rgb(of color: Color) -> RGB {
+        let converted = NSColor(color).usingColorSpace(.sRGB) ?? NSColor(srgbRed: 0, green: 1, blue: 0, alpha: 1)
+        func byte(_ value: CGFloat) -> UInt8 { UInt8(min(max((value * 255).rounded(), 0), 255)) }
+        return RGB(byte(converted.redComponent), byte(converted.greenComponent), byte(converted.blueComponent))
+    }
 }
 
 final class ConfigState: ObservableObject {
@@ -207,16 +272,30 @@ final class ConfigState: ObservableObject {
     // Buttons (left, right, middle, forward, back)
     @Published var buttonActions: [ButtonAction] = [.leftClick, .rightClick, .middleClick, .forward, .back]
 
-    // Lighting
+    // Lighting (mode, brightness, speed, colour) and Power (sleep timer) are read from / written to the mouse (report 0x05)
     @Published var lightMode: LightMode = .steady
-    @Published var brightness: Double = 80
-    @Published var lightSpeed: Double = 50
-    @Published var lightColor: Color = .green
+    /// 1...8, the mouse's own brightness levels.
+    @Published var brightnessLevel: Double = 8
+    /// 1...5, 5 is the fastest animation.
+    @Published var lightSpeedLevel: Double = 3
+    @Published var lightColor: Color = LEDColor.RGB(0, 255, 0).color
 
     // Power
     @Published var sleepAfterSeconds = 60
-    @Published var lowBatteryAlert = true
-    @Published var alertThreshold: Double = 20
+    // The low battery alert is a feature of this app (the mouse has no such setting), so it is stored on the Mac.
+    @Published var lowBatteryAlert: Bool = (UserDefaults.standard.object(forKey: "lowBatteryAlertEnabled") as? Bool) ?? true {
+        didSet {
+            UserDefaults.standard.set(lowBatteryAlert, forKey: "lowBatteryAlertEnabled")
+            if lowBatteryAlert { requestNotificationAccess() }
+        }
+    }
+    @Published var alertThreshold: Double = (UserDefaults.standard.object(forKey: "lowBatteryAlertThreshold") as? Double) ?? 20 {
+        didSet { UserDefaults.standard.set(alertThreshold, forKey: "lowBatteryAlertThreshold") }
+    }
+    /// True when macOS notifications are switched off for the app, so the alert could never be seen.
+    @Published var notificationsBlocked = false
+    /// Result of the last "Send test alert" press (shown under the button).
+    @Published var testAlertMessage: String?
 
     // MARK: Mouse sync (DPI only)
 
@@ -242,6 +321,17 @@ final class ConfigState: ObservableObject {
     private var isApplyingButtons = false
     private var isWritingButtons = false
     private var isSyncingButtons = false
+
+    // Lighting & power sync (same scheme again)
+    private var lightingKnown: LightingSettings?
+    private var hasPendingLightingEdits = false
+    private var isApplyingLighting = false
+    private var isWritingLighting = false
+    private var isSyncingLighting = false
+    /// How many times a failed lighting/sleep write was retried automatically (a sleeping mouse often misses the first try).
+    private var lightingRetries = 0
+    /// True once the low-battery notification went out; re-armed when the battery recovers or is charging.
+    private var batteryAlertSent = false
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -275,6 +365,20 @@ final class ConfigState: ObservableObject {
             .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.pushButtonsIfNeeded() }
             .store(in: &cancellables)
+
+        let lightingChanges = Publishers.CombineLatest(
+            Publishers.CombineLatest3($lightMode, $brightnessLevel, $lightSpeedLevel),
+            Publishers.CombineLatest($lightColor, $sleepAfterSeconds)
+        ).dropFirst()
+        lightingChanges
+            .sink { [weak self] left, right in
+                self?.noteLightingChange(Self.makeLighting(mode: left.0, brightness: left.1, speed: left.2, color: right.0, sleep: right.1))
+            }
+            .store(in: &cancellables)
+        lightingChanges
+            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.pushLightingIfNeeded() }
+            .store(in: &cancellables)
     }
 
     /// Connects the DPI state to the mouse: mouse -> UI updates, UI edits -> mouse writes.
@@ -293,6 +397,24 @@ final class ConfigState: ObservableObject {
             .compactMap { $0 }
             .sink { [weak self] report in self?.applyMouseButtons(report) }
             .store(in: &cancellables)
+        device.$mouseLighting
+            .compactMap { $0 }
+            .sink { [weak self] settings in self?.applyMouseLighting(settings) }
+            .store(in: &cancellables)
+
+        // Low battery alert: watches the battery heartbeat and the alert settings.
+        Publishers.CombineLatest4(
+            device.$batteryLevel,
+            device.$hasBatteryReading,
+            device.$isCharging,
+            Publishers.CombineLatest($lowBatteryAlert, $alertThreshold)
+        )
+        .sink { [weak self] level, hasReading, charging, alert in
+            self?.evaluateBattery(level: level, hasReading: hasReading, charging: charging, enabled: alert.0, threshold: alert.1)
+        }
+        .store(in: &cancellables)
+
+        if lowBatteryAlert { requestNotificationAccess() }
     }
 
     /// ↻ button: drops unsent edits and loads whatever the mouse holds right now.
@@ -564,6 +686,156 @@ final class ConfigState: ObservableObject {
         if buttonActions != actions { buttonActions = actions }
     }
 
+    // MARK: Lighting & power sync
+
+    private static func makeLighting(mode: LightMode, brightness: Double, speed: Double, color: Color, sleep: Int) -> LightingSettings {
+        let rgb = LEDColor.rgb(of: color)
+        return LightingSettings(
+            mode: mode.hardware,
+            brightness: min(max(Int(brightness.rounded()), 1), 8),
+            speed: min(max(Int(speed.rounded()), 1), 5),
+            red: rgb.red,
+            green: rgb.green,
+            blue: rgb.blue,
+            sleepSeconds: sleep
+        )
+    }
+
+    private var currentLighting: LightingSettings {
+        Self.makeLighting(mode: lightMode, brightness: brightnessLevel, speed: lightSpeedLevel, color: lightColor, sleep: sleepAfterSeconds)
+    }
+
+    /// ↻ button on the Lighting and Power pages: drops unsent edits and loads what the mouse holds right now.
+    func syncLightingFromMouse() {
+        guard let device, !isWritingLighting, !isSyncingLighting else { return }
+        hasPendingLightingEdits = false
+        isSyncingLighting = true
+        device.refreshLighting(userInitiated: true) { [weak self] settings in
+            guard let self else { return }
+            self.isSyncingLighting = false
+            if let settings { self.applyMouseLighting(settings) }
+        }
+    }
+
+    private func noteLightingChange(_ settings: LightingSettings) {
+        guard !isApplyingLighting, let known = lightingKnown else { return }
+        lightingRetries = 0   // a new edit gets a fresh set of retries
+        if settings != known { hasPendingLightingEdits = true }
+    }
+
+    private func pushLightingIfNeeded() {
+        guard !isApplyingLighting, !isWritingLighting, !isSyncingLighting else { return }
+        guard let device, let known = lightingKnown else {
+            hasPendingLightingEdits = false
+            return
+        }
+        let wanted = currentLighting
+        guard wanted != known else {
+            hasPendingLightingEdits = false
+            return
+        }
+
+        isWritingLighting = true
+        device.writeLighting(wanted) { [weak self] confirmed in
+            self?.finishLightingWrite(sent: wanted, confirmed: confirmed)
+        }
+    }
+
+    private func finishLightingWrite(sent: LightingSettings, confirmed: LightingSettings?) {
+        isWritingLighting = false
+        hasPendingLightingEdits = false
+        if let confirmed {
+            lightingKnown = confirmed
+            lightingRetries = 0
+        } else if currentLighting == sent, lightingRetries < 3 {
+            // The write failed (typically a sleeping mouse): keep the edit and try again in a moment,
+            // so the LED / sleep timer never silently stays different from what the UI shows.
+            lightingRetries += 1
+            hasPendingLightingEdits = true
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.pushLightingIfNeeded() }
+            return
+        }
+
+        if currentLighting != sent {
+            // The user kept editing while the write was in flight: send the newer state too.
+            hasPendingLightingEdits = true
+            pushLightingIfNeeded()
+        } else if let confirmed, confirmed != sent {
+            // The mouse disagrees with what we sent: show what it really holds.
+            applyMouseLighting(confirmed)
+        }
+    }
+
+    /// Loads the mouse's lighting / sleep settings into the UI (skipped while the user has unsent edits).
+    private func applyMouseLighting(_ settings: LightingSettings) {
+        guard !hasPendingLightingEdits, !isWritingLighting else { return }
+        lightingKnown = settings
+        isApplyingLighting = true
+        defer { isApplyingLighting = false }
+
+        let mode = LightMode(settings.mode)
+        if lightMode != mode { lightMode = mode }
+        if Int(brightnessLevel.rounded()) != settings.brightness { brightnessLevel = Double(settings.brightness) }
+        if Int(lightSpeedLevel.rounded()) != settings.speed { lightSpeedLevel = Double(settings.speed) }
+        let rgb = LEDColor.RGB(settings.red, settings.green, settings.blue)
+        if LEDColor.rgb(of: lightColor) != rgb { lightColor = rgb.color }
+        if sleepAfterSeconds != settings.sleepSeconds { sleepAfterSeconds = settings.sleepSeconds }
+    }
+
+    // MARK: Low battery alert
+
+    private func evaluateBattery(level: Int, hasReading: Bool, charging: Bool, enabled: Bool, threshold: Double) {
+        guard enabled else {
+            batteryAlertSent = false
+            return
+        }
+        guard hasReading else { return }
+        if charging || Double(level) > threshold {
+            batteryAlertSent = false   // recovered: the next drop alerts again
+            return
+        }
+        guard !batteryAlertSent else { return }
+        batteryAlertSent = true
+        BatteryNotifier.shared.notifyLowBattery(level: level)
+    }
+
+    func requestNotificationAccess() {
+        Task { @MainActor [weak self] in
+            let allowed = await BatteryNotifier.shared.requestAccess()
+            self?.notificationsBlocked = !allowed
+        }
+    }
+
+    /// Re-checks the macOS notification permission without asking (the user may have just changed it in System Settings).
+    func refreshNotificationStatus() {
+        guard lowBatteryAlert else {
+            notificationsBlocked = false
+            return
+        }
+        Task { @MainActor [weak self] in
+            let allowed = await BatteryNotifier.shared.requestAccess(prompt: false)
+            self?.notificationsBlocked = !allowed
+        }
+    }
+
+    /// "Send a test alert" button: asks for permission FIRST (a notification sent before that is silently dropped),
+    /// then shows the notification, and reports in the UI if macOS refuses it.
+    func sendTestBatteryAlert() {
+        testAlertMessage = nil
+        let level = Int(alertThreshold)
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let allowed = await BatteryNotifier.shared.requestAccess()
+            self.notificationsBlocked = !allowed
+            guard allowed else { return }
+            if let problem = await BatteryNotifier.shared.postTest(level: level) {
+                self.testAlertMessage = "macOS couldn't show the notification: \(problem)"
+            } else {
+                self.testAlertMessage = "Test alert sent. If you don't see it, check Focus / Do Not Disturb."
+            }
+        }
+    }
+
     // MARK: DPI logic
 
     var enabledStageCount: Int { dpiStages.filter(\.isEnabled).count }
@@ -756,23 +1028,25 @@ private struct PillSegmented<T: Hashable>: View {
 
 private struct SwatchRow: View {
     @Binding var selection: Color
-    private let presets: [Color] = [.red, .orange, .yellow, .green, .cyan, .blue, .purple, .pink, .white]
 
     var body: some View {
+        // Compared by the bytes the mouse stores, so the ring follows the real LED colour.
+        let current = LEDColor.rgb(of: selection)
+
         HStack(spacing: 10) {
-            ForEach(Array(presets.enumerated()), id: \.offset) { _, color in
+            ForEach(LEDColor.presets, id: \.self) { preset in
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selection = color }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { selection = preset.color }
                 } label: {
                     Circle()
-                        .fill(color)
+                        .fill(preset.color)
                         .frame(width: 22, height: 22)
                         .overlay(Circle().strokeBorder(Color.primary.opacity(0.25), lineWidth: 0.5))
                         .overlay(
                             Circle()
                                 .strokeBorder(Color.accentColor, lineWidth: 2)
                                 .padding(-4)
-                                .opacity(selection == color ? 1 : 0)
+                                .opacity(current == preset ? 1 : 0)
                         )
                 }
                 .buttonStyle(PressableStyle())
@@ -1344,118 +1618,6 @@ private struct PerformancePage: View {
     }
 }
 
-/// Temporary tool for working out what the 18 entries and their codes in report 0x08 mean.
-/// It changes ONE entry at a time and can put the original report back.
-private struct ButtonsExperimentCard: View {
-    @ObservedObject var device: DeviceViewModel
-    @State private var report: ButtonsReport?
-    @State private var status: String?
-    @State private var isBusy = false
-    @State private var entry = 1     // 1...18
-    @State private var code = 1      // 0...16
-
-    private func hex(_ value: Int) -> String { String(format: "0x%02X", value) }
-
-    private func pill(_ title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(Capsule().fill(Color.primary.opacity(0.07)))
-        }
-        .buttonStyle(PressableStyle())
-        .disabled(disabled)
-    }
-
-    var body: some View {
-        SettingCard {
-            Text("Button report 0x08 (experimental)").font(.system(size: 13, weight: .medium))
-            Text("Read the raw report (it is also copied), or change ONE entry to see what it controls. Restore puts the factory buttons back.")
-                .font(.system(size: 11))
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-            HStack(spacing: 8) {
-                pill(isBusy ? "Working…" : "Read & copy", disabled: isBusy) { read() }
-                pill("Restore factory", disabled: isBusy) { restore() }
-            }
-
-            if let report {
-                Text(report.hexDump)
-                    .font(.system(size: 11, design: .monospaced))
-                    .textSelection(.enabled)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Divider()
-
-                HStack(spacing: 16) {
-                    Stepper("Entry \(entry)", value: $entry, in: 1...ButtonsReport.entryCount)
-                    Stepper("Code \(hex(code))", value: $code, in: 0...16)
-                }
-                .font(.system(size: 12))
-
-                pill("Send: entry \(entry) = \(hex(code))", disabled: isBusy) { send() }
-            }
-
-            if let status {
-                Text(status)
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-        }
-    }
-
-    private func read() {
-        isBusy = true
-        status = nil
-        device.readButtonsReport { result in
-            isBusy = false
-            guard let result else {
-                status = "The mouse didn't answer — move it to wake it up"
-                return
-            }
-            report = result
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(result.hexDump, forType: .string)
-            status = "Report read and copied to the clipboard"
-        }
-    }
-
-    private func send() {
-        isBusy = true
-        status = nil
-        let index = entry - 1
-        let value = UInt8(code)
-        device.writeButtonsEntry(index, code: value) { result, error in
-            isBusy = false
-            guard let result else {
-                status = error ?? "Couldn't send"
-                return
-            }
-            report = result
-            status = result.codes[index] == value
-                ? "Mouse confirmed: entry \(index + 1) = \(hex(Int(value)))"
-                : "The mouse reported a different value than was sent"
-        }
-    }
-
-    private func restore() {
-        isBusy = true
-        status = nil
-        device.restoreButtonsReport { result, error in
-            isBusy = false
-            guard let result else {
-                status = error ?? "Couldn't restore"
-                return
-            }
-            report = result
-            status = "Factory buttons restored"
-        }
-    }
-}
-
 private struct ButtonsPage: View {
     @ObservedObject var state: ConfigState
     @ObservedObject var device: DeviceViewModel
@@ -1487,62 +1649,63 @@ private struct ButtonsPage: View {
                 }
             }
 
-            HStack(spacing: 10) {
-                Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { state.resetButtonsToFactory() }
-                } label: {
-                    Text("Reset to factory")
-                        .font(.system(size: 12, weight: .medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 6)
-                        .background(Capsule().fill(Color.primary.opacity(0.07)))
-                }
-                .buttonStyle(PressableStyle())
-
-                Text("Back and Forward are confirmed on the X11. The other actions follow its factory layout, so check them in Live Test.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+            Button {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { state.resetButtonsToFactory() }
+            } label: {
+                Text("Reset to factory")
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.primary.opacity(0.07)))
             }
-
-            DisclosureGroup("Advanced: raw report") {
-                ButtonsExperimentCard(device: device)
-                    .padding(.top, 8)
-            }
-            .font(.system(size: 12))
+            .buttonStyle(PressableStyle())
         }
     }
 }
 
 private struct LightingPage: View {
     @ObservedObject var state: ConfigState
+    @ObservedObject var device: DeviceViewModel
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Lighting", subtitle: "Effect, brightness and colour of the mouse LED.")
+            HStack(alignment: .top, spacing: 10) {
+                SectionHeader(title: "Lighting", subtitle: "Effect, brightness and colour of the mouse LED. Changes are sent to the mouse as you make them.")
+                Spacer(minLength: 8)
+                SyncBadge(state: device.lightingSyncState) { state.syncLightingFromMouse() }
+            }
 
             SettingCard {
                 Text("Mode").font(.system(size: 13, weight: .medium))
-                PillSegmented(options: LightMode.allCases, label: { $0.rawValue }, selection: $state.lightMode)
+                // Seven modes don't fit a narrow window in one row: let the row scroll sideways.
+                ScrollView(.horizontal) {
+                    PillSegmented(options: LightMode.allCases, label: { $0.rawValue }, selection: $state.lightMode)
+                }
+                .scrollIndicators(.hidden)
             }
 
             if state.lightMode != .off {
                 SettingCard {
-                    SliderRow(title: "Brightness", valueText: "\(Int(state.brightness))%",
-                              value: $state.brightness, range: 0...100)
-                    if state.lightMode == .breathing || state.lightMode == .rainbow {
-                        SliderRow(title: "Speed", valueText: "\(Int(state.lightSpeed))%",
-                                  value: $state.lightSpeed, range: 0...100)
+                    SliderRow(title: "Brightness", valueText: "\(Int((state.brightnessLevel / 8 * 100).rounded()))%",
+                              value: $state.brightnessLevel, range: 1...8, step: 1)
+                    if state.lightMode.usesSpeed {
+                        SliderRow(title: "Speed", valueText: "\(Int(state.lightSpeedLevel.rounded())) / 5",
+                                  value: $state.lightSpeedLevel, range: 1...5, step: 1)
                     }
                 }
                 .transition(.opacity.combined(with: .move(edge: .top)))
 
-                if state.lightMode != .rainbow {
+                if state.lightMode.usesColor {
                     SettingCard {
                         Text("Colour").font(.system(size: 13, weight: .medium))
                         SwatchRow(selection: $state.lightColor)
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
+                } else if state.lightMode.followsDPIStage {
+                    Label("The LED takes the colour of the active DPI stage (set it in the DPI tab).", systemImage: "info.circle")
+                        .font(.system(size: 12))
+                        .foregroundStyle(.secondary)
+                        .transition(.opacity)
                 }
             }
         }
@@ -1552,18 +1715,33 @@ private struct LightingPage: View {
 
 private struct PowerPage: View {
     @ObservedObject var state: ConfigState
+    @ObservedObject var device: DeviceViewModel
+
+    /// The mouse counts in half-minutes, so 30 s is the shortest timer it can hold (10 s isn't possible).
+    /// If the mouse holds a value that isn't one of the presets, it is added so the current setting is always visible.
+    private var sleepOptions: [Int] {
+        let presets = [30, 60, 120, 300, 600]
+        return presets.contains(state.sleepAfterSeconds) ? presets : (presets + [state.sleepAfterSeconds]).sorted()
+    }
+
+    private func sleepLabel(_ seconds: Int) -> String {
+        seconds >= 60 && seconds % 60 == 0 ? "\(seconds / 60) min" : "\(seconds) s"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Power", subtitle: "Sleep behaviour and battery alerts.")
+            HStack(alignment: .top, spacing: 10) {
+                SectionHeader(title: "Power", subtitle: "Sleep behaviour and battery alerts. The sleep timer is sent to the mouse as you change it.")
+                Spacer(minLength: 8)
+                SyncBadge(state: device.lightingSyncState) { state.syncLightingFromMouse() }
+            }
 
             SettingCard {
                 Text("Sleep after").font(.system(size: 13, weight: .medium))
-                PillSegmented(
-                    options: [10, 30, 60, 300],
-                    label: { $0 >= 60 ? "\($0 / 60) min" : "\($0) s" },
-                    selection: $state.sleepAfterSeconds
-                )
+                PillSegmented(options: sleepOptions, label: sleepLabel, selection: $state.sleepAfterSeconds)
+                Text("The mouse goes to sleep after this much inactivity. Moving it wakes it up.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
             }
 
             SettingCard {
@@ -1573,23 +1751,97 @@ private struct PowerPage: View {
                     SliderRow(title: "Alert threshold", valueText: "\(Int(state.alertThreshold))%",
                               value: $state.alertThreshold, range: 5...50, step: 5)
                         .transition(.opacity.combined(with: .move(edge: .top)))
+
+                    HStack(spacing: 10) {
+                        Button {
+                            state.sendTestBatteryAlert()
+                        } label: {
+                            Text("Send test alert")
+                                .font(.system(size: 12, weight: .medium))
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 6)
+                                .background(Capsule().fill(Color.primary.opacity(0.07)))
+                        }
+                        .buttonStyle(PressableStyle())
+
+                        if state.notificationsBlocked {
+                            Label("Notifications are off for this app. Turn them on in System Settings › Notifications.",
+                                  systemImage: "exclamationmark.circle")
+                                .font(.system(size: 11))
+                                .foregroundStyle(.orange)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+
+                    if let message = state.testAlertMessage {
+                        Text(message)
+                            .font(.system(size: 11))
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
             }
         }
         .animation(.spring(response: 0.4, dampingFraction: 0.85), value: state.lowBatteryAlert)
+        .animation(.easeInOut(duration: 0.2), value: state.notificationsBlocked)
+        .onAppear { state.refreshNotificationStatus() }
+        .onReceive(NotificationCenter.default.publisher(for: NSApplication.didBecomeActiveNotification)) { _ in
+            state.refreshNotificationStatus()
+        }
     }
 }
 
 // MARK: - Panel
 
+/// Holds sizes without publishing them: reading or writing these never triggers a SwiftUI update.
+private final class PanelSizeBox {
+    var live: CGSize = .zero
+    var frozen: CGSize?
+}
+
 struct ConfigPanelView: View {
     let isDark: Bool
     @ObservedObject var device: DeviceViewModel
     @StateObject private var state = ConfigState()
+    @StateObject private var resize = WindowResizeMonitor()
     @State private var selected: ConfigTab = .dpi
+    @State private var sizes = PanelSizeBox()
     @Namespace private var tabNamespace
 
+    /// While the window is being resized (dragged, zoomed, full screen) the content keeps the size it had when
+    /// the resize started. Only the panel's background and clip follow the window, so the page (8 DPI rows with
+    /// sliders, text fields, toggles, the colour wheel...) isn't laid out again on every frame. One real layout
+    /// happens when the resize ends.
+    private var lockedSize: CGSize? {
+        guard resize.isResizing else {
+            sizes.frozen = nil
+            return nil
+        }
+        if sizes.frozen == nil, sizes.live.width > 0, sizes.live.height > 0 { sizes.frozen = sizes.live }
+        return sizes.frozen
+    }
+
     var body: some View {
+        let locked = lockedSize
+
+        Color.clear
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .overlay(alignment: .topLeading) {
+                content
+                    .frame(width: locked?.width, height: locked?.height, alignment: .topLeading)
+            }
+            .clipped()
+            .onGeometryChange(for: CGSize.self) { $0.size } action: { sizes.live = $0 }
+            .background(PanelBackground(isDark: isDark))
+            .onAppear {
+                state.attach(device)
+                resize.start()
+            }
+            .onDisappear { resize.stop() }
+    }
+
+    private var content: some View {
         VStack(alignment: .leading, spacing: 14) {
             ScrollView(.horizontal) {
                 HStack(spacing: 8) {
@@ -1617,10 +1869,8 @@ struct ConfigPanelView: View {
             }
         }
         .padding(22)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(PanelBackground(isDark: isDark))
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: selected)
-        .onAppear { state.attach(device) }
     }
 
     @ViewBuilder
@@ -1629,8 +1879,8 @@ struct ConfigPanelView: View {
         case .dpi: DPIPage(state: state, device: device)
         case .performance: PerformancePage(state: state, device: device)
         case .buttons: ButtonsPage(state: state, device: device)
-        case .lighting: LightingPage(state: state)
-        case .power: PowerPage(state: state)
+        case .lighting: LightingPage(state: state, device: device)
+        case .power: PowerPage(state: state, device: device)
         }
     }
 }

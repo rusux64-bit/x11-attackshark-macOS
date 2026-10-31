@@ -62,6 +62,14 @@ public final class DeviceViewModel: ObservableObject {
     @Published public private(set) var mousePerformance: PerformanceSettings?
     private var performanceTask: Task<Void, Never>?
 
+    // MARK: Lighting & power sync (report 0x05: light mode, brightness, speed, colour, sleep timer)
+
+    @Published public private(set) var lightingSyncState: DPISyncState = .noMouse
+    /// Lighting / sleep settings reported by the mouse: first read and manual refresh.
+    /// (Not published after our own writes: the UI already holds those values.)
+    @Published public private(set) var mouseLighting: LightingSettings?
+    private var lightingTask: Task<Void, Never>?
+
     /// All blocking HID I/O happens here, one request at a time.
     private let hidQueue = DispatchQueue(label: "SharkControl.hid", qos: .userInitiated)
     /// Every HID endpoint that is attached right now (the mouse exposes several).
@@ -155,6 +163,9 @@ public final class DeviceViewModel: ObservableObject {
             self.probeTask?.cancel()
             self.refreshTask?.cancel()
             self.performanceTask?.cancel()
+            self.lightingTask?.cancel()
+            self.mouseLighting = nil
+            self.lightingSyncState = .noMouse
             self.endpoints.removeAll()
             self.configTransport = nil
             self.dpiBase = nil
@@ -260,6 +271,7 @@ public final class DeviceViewModel: ObservableObject {
         dpiSyncState = .searching
         performanceSyncState = .searching
         buttonsSyncState = .searching
+        lightingSyncState = .searching
 
         let transports = probeCandidates().map { DeviceTransport(hidDevice: $0) }
         let found = await onHIDQueue { () -> (Int, DPIConfiguration)? in
@@ -281,16 +293,19 @@ public final class DeviceViewModel: ObservableObject {
             dpiSyncState = .synced
             refreshPerformance()
             refreshButtons()
+            refreshLighting()
         } else if attempt < 5 {
             // Wireless mice sleep after a while: keep trying, a mouse movement wakes it up.
             dpiSyncState = .failed("Mouse isn't answering — move it to wake it up")
             performanceSyncState = dpiSyncState
             buttonsSyncState = dpiSyncState
+            lightingSyncState = dpiSyncState
             scheduleProbe(after: 3, attempt: attempt + 1)
         } else {
             dpiSyncState = .failed("Couldn't read the DPI settings — press ↻ to retry")
             performanceSyncState = .failed("Couldn't read the settings — press ↻ to retry")
             buttonsSyncState = .failed("Couldn't read the settings — press ↻ to retry")
+            lightingSyncState = .failed("Couldn't read the settings — press ↻ to retry")
         }
     }
 
@@ -430,6 +445,97 @@ public final class DeviceViewModel: ObservableObject {
                     completion(snapshot.settings)
                 } else {
                     self.performanceSyncState = .unverified
+                    completion(target)
+                }
+            }
+        }
+    }
+
+    // MARK: - Lighting & power sync
+
+    /// Reads the lighting / sleep settings from the mouse and publishes them.
+    /// `userInitiated` is the ↻ button: it shows "Reading from mouse…" and retries once if the mouse is slow.
+    /// `completion` receives what was read, or nil if nothing could be read.
+    public func refreshLighting(userInitiated: Bool = false, completion: ((LightingSettings?) -> Void)? = nil) {
+        guard isConnected, let transport = configTransport else {
+            completion?(nil)
+            return
+        }
+        guard lightingSyncState != .writing else {
+            completion?(nil)
+            return
+        }
+
+        lightingTask?.cancel()
+        if userInitiated {
+            lightingSyncState = .reading
+        } else if mouseLighting == nil {
+            lightingSyncState = .searching
+        }
+
+        lightingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let started = Date()
+            let settings = await self.onHIDQueue { () -> LightingSettings? in
+                if let first = transport.readLightingSettings() { return first }
+                guard userInitiated else { return nil }
+                usleep(150_000)
+                return transport.readLightingSettings()
+            }
+            if userInitiated {
+                let elapsed = Date().timeIntervalSince(started)
+                if elapsed < 0.45 { try? await Task.sleep(for: .seconds(0.45 - elapsed)) }
+            }
+            guard !Task.isCancelled, self.configTransport === transport else {
+                completion?(nil)
+                return
+            }
+            if let settings {
+                self.mouseLighting = settings
+                self.lightingSyncState = .synced
+            } else {
+                self.lightingSyncState = .failed("Mouse isn't answering — move it to wake it up")
+            }
+            completion?(settings)
+        }
+    }
+
+    /// Sends the Lighting / Power settings chosen in the UI to the mouse, then reads them back to verify.
+    /// `completion` runs on the main thread with the settings now believed to be on the mouse
+    /// (the read-back when available), or nil if nothing could be sent.
+    public func writeLighting(_ target: LightingSettings, completion: @escaping (LightingSettings?) -> Void) {
+        guard let transport = configTransport else {
+            lightingSyncState = isConnected ? .failed("Not synced with the mouse yet — change not sent") : .noMouse
+            completion(nil)
+            return
+        }
+
+        lightingSyncState = .writing
+        lightingTask?.cancel()
+        lightingTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let mainID = ObjectIdentifier(transport.hidDevice)
+            let alternates = self.endpoints.values
+                .filter { ObjectIdentifier($0) != mainID }
+                .map { DeviceTransport(hidDevice: $0) }
+            let result = await self.onHIDQueue { transport.writeLighting(target, alternates: alternates) }
+
+            guard self.configTransport === transport else {
+                completion(nil)
+                return
+            }
+            switch result {
+            case .failed(let message):
+                self.lightingSyncState = .failed(message)
+                completion(nil)
+            case .written(let readback):
+                if let readback {
+                    self.lightingSyncState = readback == target
+                        ? .synced
+                        : .failed("The mouse reported different values than were sent")
+                    completion(readback)
+                } else {
+                    self.lightingSyncState = .unverified
                     completion(target)
                 }
             }

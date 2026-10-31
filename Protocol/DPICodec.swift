@@ -14,6 +14,7 @@ public nonisolated enum ProtocolError: Error, Equatable {
     case invalidPollingCode(UInt8)
     case invalidDebounce(Int)
     case invalidButtonEntry(Int)
+    case invalidLightingSetting
 }
 
 public nonisolated struct DPIColor: Equatable, Sendable {

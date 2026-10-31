@@ -158,6 +158,114 @@ public nonisolated struct SystemSettingsReport: Equatable, Sendable {
     }
 }
 
+// MARK: - Lighting & power (report 0x05)
+//
+// Layout (15 bytes), confirmed against the default report `05 0F 01 00 03 A8 00 FF 00 01 04 01 AF 00 00`:
+//
+//     [3]     light mode in the HIGH nibble (0 off, 1 steady, 2 breathing, 3 neon, 4 colour breathing,
+//             5 steady by DPI stage, 6 breathing by DPI stage)
+//     [4]     high nibble: deep-sleep timer (high part), low nibble: LED animation speed (inverted, see below)
+//     [5]     high nibble: deep-sleep timer (low part), low nibble: LED brightness 1...8
+//     [6...8] LED colour R, G, B
+//     [9]     idle sleep timer in half-minutes
+//     [10]    key response time (debounce), see `SystemSettingsReport`
+//     [11,12] 16-bit big-endian sum of bytes 3...10
+//
+// Every write is read-modify-write: only the fields that really changed are touched, so the deep-sleep timer
+// and every byte the app doesn't know about are sent back exactly as the mouse reported them.
+
+public nonisolated enum LightingMode: UInt8, CaseIterable, Sendable {
+    case off = 0
+    case steady = 1
+    case breathing = 2
+    case neon = 3
+    case colorBreathing = 4
+    case dpiSteady = 5
+    case dpiBreathing = 6
+}
+
+/// What the Lighting and Power tabs edit (everything that lives in report 0x05 apart from the debounce time).
+public nonisolated struct LightingSettings: Equatable, Sendable {
+    public static let brightnessRange = 1...8
+    /// 1 = slowest ... 5 = fastest (the mouse stores it inverted).
+    public static let speedRange = 1...5
+    /// The mouse counts the idle sleep timer in half-minutes.
+    public static let sleepStepSeconds = 30
+
+    public var mode: LightingMode
+    public var brightness: Int
+    public var speed: Int
+    public var red: UInt8
+    public var green: UInt8
+    public var blue: UInt8
+    public var sleepSeconds: Int
+
+    public init(mode: LightingMode, brightness: Int, speed: Int, red: UInt8, green: UInt8, blue: UInt8, sleepSeconds: Int) {
+        self.mode = mode
+        self.brightness = brightness
+        self.speed = speed
+        self.red = red
+        self.green = green
+        self.blue = blue
+        self.sleepSeconds = sleepSeconds
+    }
+}
+
+extension SystemSettingsReport {
+    /// The lighting and sleep settings held by this report.
+    public var lighting: LightingSettings {
+        let mode = LightingMode(rawValue: bytes[3] >> 4) ?? .steady
+        let hardwareSpeed = min(max(Int(bytes[4] & 0x0F), 1), 5)
+        let brightness = min(max(Int(bytes[5] & 0x0F), 1), 8)
+        return LightingSettings(
+            mode: mode,
+            brightness: brightness,
+            speed: 6 - hardwareSpeed,
+            red: bytes[6],
+            green: bytes[7],
+            blue: bytes[8],
+            sleepSeconds: Int(bytes[9]) * LightingSettings.sleepStepSeconds
+        )
+    }
+
+    /// The complete report to send for new lighting / sleep settings (checksum recomputed).
+    /// Fields that already match are not touched, so their original bytes (including nibbles this app doesn't
+    /// edit, like the deep-sleep timer) survive unchanged.
+    public func applying(_ target: LightingSettings) throws -> [UInt8] {
+        let step = LightingSettings.sleepStepSeconds
+        guard LightingSettings.brightnessRange.contains(target.brightness),
+              LightingSettings.speedRange.contains(target.speed) else {
+            throw ProtocolError.invalidLightingSetting
+        }
+
+        let current = lighting
+        var report = bytes
+        if target.mode != current.mode {
+            report[3] = (report[3] & 0x0F) | (target.mode.rawValue << 4)
+        }
+        if target.speed != current.speed {
+            report[4] = (report[4] & 0xF0) | UInt8(6 - target.speed)
+        }
+        if target.brightness != current.brightness {
+            report[5] = (report[5] & 0xF0) | UInt8(target.brightness)
+        }
+        if target.red != current.red { report[6] = target.red }
+        if target.green != current.green { report[7] = target.green }
+        if target.blue != current.blue { report[8] = target.blue }
+        if target.sleepSeconds != current.sleepSeconds {
+            guard target.sleepSeconds % step == 0, (1...255).contains(target.sleepSeconds / step) else {
+                throw ProtocolError.invalidLightingSetting
+            }
+            report[9] = UInt8(target.sleepSeconds / step)
+        }
+
+        let checksum = ProtocolHelper.checksum(data: Array(report[3..<11]))
+        report[11] = checksum[0]
+        report[12] = checksum[1]
+        return report
+    }
+}
+
 // MARK: - Buttons (report 0x08)
 
 /// Report 0x08 (59 bytes). Layout confirmed against a real dump (the checksum matches):

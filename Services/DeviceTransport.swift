@@ -15,6 +15,13 @@ public nonisolated enum ButtonsWriteResult: Sendable {
     case written(ButtonsReport?)
 }
 
+/// Outcome of writing the Lighting / Power settings (report 0x05).
+public nonisolated enum LightingWriteResult: Sendable {
+    case failed(String)
+    /// Nothing needed sending, or the report was sent. The value is the read-back (nil if the mouse didn't answer it).
+    case written(LightingSettings?)
+}
+
 /// Talks to ONE HID endpoint of the mouse.
 ///
 /// Everything here is synchronous and can block for a few hundred milliseconds (the mouse answers a read
@@ -22,6 +29,8 @@ public nonisolated enum ButtonsWriteResult: Sendable {
 /// `nonisolated` because the app target defaults to @MainActor.
 public nonisolated final class DeviceTransport: @unchecked Sendable {
     public let hidDevice: IOHIDDevice
+    /// IOReturn code of the last refused write (nil after a successful one). Shown in the UI to help diagnose.
+    public private(set) var lastFailure: String?
 
     public init(hidDevice: IOHIDDevice) {
         self.hidDevice = hidDevice
@@ -30,23 +39,44 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
     /// Sends a feature report. `data` is the complete report INCLUDING the report ID as its first byte.
     @discardableResult
     public func sendFeatureReport(reportID: UInt8, data: [UInt8], logFailure: Bool = true) -> Bool {
-        let result = data.withUnsafeBufferPointer { buffer -> IOReturn in
-            guard let base = buffer.baseAddress else { return kIOReturnError }
-            return IOHIDDeviceSetReport(
-                hidDevice,
-                kIOHIDReportTypeFeature,
-                CFIndex(reportID),
-                base,
-                buffer.count
-            )
+        func attempt(_ bytes: [UInt8], type: IOHIDReportType = kIOHIDReportTypeFeature) -> IOReturn {
+            bytes.withUnsafeBufferPointer { buffer -> IOReturn in
+                guard let base = buffer.baseAddress else { return kIOReturnError }
+                return IOHIDDeviceSetReport(hidDevice, type, CFIndex(reportID), base, buffer.count)
+            }
+        }
+
+        var result = attempt(data)
+
+        // Config writes (not the 0xA0 read request) are retried: right after a read request the mouse can still be
+        // busy and rejects the write, which over the cable shows up as a USB error (0xe0005000).
+        if result != kIOReturnSuccess, reportID != ProtocolConstants.reportReadReq {
+            for delay in [UInt32(80_000), UInt32(200_000)] {
+                usleep(delay)
+                result = attempt(data)
+                if result == kIOReturnSuccess { break }
+            }
+            // Some USB HID stacks want the payload without the leading report ID byte.
+            if result != kIOReturnSuccess, data.first == reportID {
+                result = attempt(Array(data.dropFirst()))
+                if result == kIOReturnSuccess { print("ℹ️ Report 0x\(String(format: "%02X", reportID)) accepted without the report ID byte") }
+            }
+            // Last resort: send it as an output report instead of a feature report.
+            if result != kIOReturnSuccess {
+                result = attempt(data, type: kIOHIDReportTypeOutput)
+                if result == kIOReturnSuccess { print("ℹ️ Report 0x\(String(format: "%02X", reportID)) accepted as an OUTPUT report") }
+            }
         }
 
         if result != kIOReturnSuccess {
+            lastFailure = String(format: "0x%08X", UInt32(bitPattern: result))
             if logFailure {
-                print("❌ Failed to send feature report ID 0x\(String(format: "%02X", reportID)): 0x\(String(UInt32(bitPattern: result), radix: 16))")
+                let hex = data.map { String(format: "%02X", $0) }.joined(separator: " ")
+                print("❌ Failed to send feature report ID 0x\(String(format: "%02X", reportID)): 0x\(String(UInt32(bitPattern: result), radix: 16))  payload: \(hex)")
             }
             return false
         }
+        lastFailure = nil
         return true
     }
 
@@ -131,6 +161,44 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
             print("⚠️ System report did not decode: \(error)")
             return nil
         }
+    }
+
+    /// Reads the lighting / sleep settings (report 0x05). Nil when the mouse doesn't answer or the answer is invalid.
+    public func readLightingSettings() -> LightingSettings? {
+        readSystemSettings()?.lighting
+    }
+
+    /// Writes the Lighting / Power settings. Read-modify-write against a fresh read of report 0x05, so the debounce
+    /// time, the deep-sleep timer and every byte the app doesn't edit stay exactly as the mouse holds them.
+    public func writeLighting(_ target: LightingSettings, alternates: [DeviceTransport] = []) -> LightingWriteResult {
+        guard let current = readSystemSettings() else {
+            return .failed("Mouse isn't answering — move it to wake it up")
+        }
+        if current.lighting == target { return .written(current.lighting) }
+
+        guard let report = try? current.applying(target) else {
+            return .failed("Unsupported lighting setting")
+        }
+        usleep(60_000)   // let the mouse finish answering the read before it gets the write
+        let sentOnMain = sendFeatureReport(reportID: ProtocolConstants.reportLight, data: report, logFailure: alternates.isEmpty)
+        // The mouse exposes several HID endpoints: if the one that answers reads refuses the write, try the others.
+        let sent = sentOnMain || alternates.contains { other in
+            let ok = other.sendFeatureReport(reportID: ProtocolConstants.reportLight, data: report, logFailure: false)
+            if ok { print("ℹ️ Lighting report accepted by another HID endpoint") }
+            return ok
+        }
+        if !sent && !alternates.isEmpty {
+            print("❌ Lighting report refused by every HID endpoint: \(report.map { String(format: "%02X", $0) }.joined(separator: " "))")
+        }
+        guard sent else {
+            return .failed("Mouse refused the lighting report (USB error \(lastFailure ?? "unknown"))")
+        }
+        usleep(150_000)   // give the mouse time to apply it before reading back
+        for _ in 0..<2 {
+            if let readback = readSystemSettings() { return .written(readback.lighting) }
+            usleep(150_000)
+        }
+        return .written(nil)
     }
 
     /// Reads and decodes the Buttons report (0x08). Nil when the mouse doesn't answer or the answer is invalid.
