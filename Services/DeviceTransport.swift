@@ -8,6 +8,13 @@ public nonisolated enum PerformanceWriteResult: Sendable {
     case written(PerformanceSnapshot?)
 }
 
+/// Outcome of writing the Buttons report.
+public nonisolated enum ButtonsWriteResult: Sendable {
+    case failed(String)
+    /// The report was sent. The value is the read-back (nil if the mouse didn't answer it).
+    case written(ButtonsReport?)
+}
+
 /// Talks to ONE HID endpoint of the mouse.
 ///
 /// Everything here is synchronous and can block for a few hundred milliseconds (the mouse answers a read
@@ -124,6 +131,58 @@ public nonisolated final class DeviceTransport: @unchecked Sendable {
             print("⚠️ System report did not decode: \(error)")
             return nil
         }
+    }
+
+    /// Reads and decodes the Buttons report (0x08). Nil when the mouse doesn't answer or the answer is invalid.
+    public func readButtonsReport() -> ButtonsReport? {
+        guard let report = readReport(reportID: ProtocolConstants.reportButtons) else { return nil }
+        do {
+            return try ButtonsReport(decoding: report)
+        } catch {
+            let raw = report.map { String(format: "%02X", $0) }.joined(separator: " ")
+            print("⚠️ Buttons report did not decode: \(error)\n    raw: \(raw)")
+            return nil
+        }
+    }
+
+    /// Changes the code byte of ONE entry. Read-modify-write against a fresh read, so every other byte stays
+    /// exactly as the mouse holds it.
+    public func writeButtonsEntry(_ index: Int, code: UInt8) -> ButtonsWriteResult {
+        guard let current = readButtonsReport() else {
+            return .failed("Mouse isn't answering — move it to wake it up")
+        }
+        guard let report = try? current.settingCode(code, forEntry: index) else {
+            return .failed("Invalid button entry")
+        }
+        return sendButtons(report)
+    }
+
+    /// Changes the code byte of several entries in one report (read-modify-write against a fresh read).
+    public func writeButtonCodes(_ codes: [Int: UInt8]) -> ButtonsWriteResult {
+        guard let current = readButtonsReport() else {
+            return .failed("Mouse isn't answering — move it to wake it up")
+        }
+        guard let report = try? current.settingCodes(codes) else {
+            return .failed("Invalid button entry")
+        }
+        return sendButtons(report)
+    }
+
+    /// Writes a complete Buttons report back (used to restore the original one).
+    public func writeButtonsReport(_ report: ButtonsReport) -> ButtonsWriteResult {
+        sendButtons(report.bytes)
+    }
+
+    private func sendButtons(_ report: [UInt8]) -> ButtonsWriteResult {
+        guard sendFeatureReport(reportID: ProtocolConstants.reportButtons, data: report) else {
+            return .failed("Couldn't send the button settings to the mouse")
+        }
+        usleep(300_000)   // give the mouse time to apply it before reading back
+        for _ in 0..<3 {
+            if let readback = readButtonsReport() { return .written(readback) }
+            usleep(300_000)
+        }
+        return .written(nil)
     }
 
     /// Polling rate + debounce + angle snapping / ripple control, read together. Nil if any of them fails.

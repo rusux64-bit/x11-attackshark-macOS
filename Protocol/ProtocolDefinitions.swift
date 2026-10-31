@@ -158,6 +158,96 @@ public nonisolated struct SystemSettingsReport: Equatable, Sendable {
     }
 }
 
+// MARK: - Buttons (report 0x08)
+
+/// Report 0x08 (59 bytes). Layout confirmed against a real dump (the checksum matches):
+///
+///     [0]      08   report ID
+///     [1]      3B   length (59)
+///     [2]      01
+///     [3...56] 18 entries of 3 bytes: <code> <param1> <param2>
+///     [57,58]  16-bit big-endian sum of bytes 3...56
+///
+/// What each entry and each code MEANS is still being worked out (see the experiment card in the Buttons tab).
+/// Writes therefore only ever change the code byte of ONE entry; every other byte is kept as the mouse reported it.
+public nonisolated struct ButtonsReport: Equatable, Sendable {
+    public static let reportLength = 59
+    public static let entryCount = 18
+    private static let firstEntryOffset = 3
+    private static let entrySize = 3
+    private static let checksumOffset = 57
+
+    /// The report exactly as the mouse sent it (first dump seen on a real X11; used as a last-resort restore point).
+    public static let observedDefaultBytes: [UInt8] = [
+        0x08, 0x3B, 0x01, 0x02, 0x00, 0x00, 0x03, 0x00, 0x00, 0x04, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01,
+        0x00, 0x00, 0x0D, 0x00, 0x00, 0x06, 0x00, 0x00, 0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00,
+        0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00, 0x01, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x09, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x3E
+    ]
+
+    public let bytes: [UInt8]
+
+    public init(decoding report: [UInt8]) throws {
+        guard report.count == Self.reportLength else {
+            throw ProtocolError.badLength(expected: Self.reportLength, actual: report.count)
+        }
+        guard report[0] == ProtocolConstants.reportButtons else {
+            throw ProtocolError.unexpectedReportID(expected: ProtocolConstants.reportButtons, actual: report[0])
+        }
+        guard report[1] == UInt8(Self.reportLength) else {
+            throw ProtocolError.invalidReportedLength(expected: UInt8(Self.reportLength), actual: report[1])
+        }
+        let expected = ProtocolHelper.checksum(data: Array(report[Self.firstEntryOffset..<Self.checksumOffset]))
+        guard Array(report[Self.checksumOffset..<(Self.checksumOffset + 2)]) == expected else {
+            throw ProtocolError.invalidChecksum
+        }
+        bytes = report
+    }
+
+    /// The code byte of every entry, in report order.
+    public var codes: [UInt8] {
+        (0..<Self.entryCount).map { bytes[Self.firstEntryOffset + $0 * Self.entrySize] }
+    }
+
+    public func entry(_ index: Int) throws -> (code: UInt8, param1: UInt8, param2: UInt8) {
+        guard (0..<Self.entryCount).contains(index) else { throw ProtocolError.invalidButtonEntry(index) }
+        let offset = Self.firstEntryOffset + index * Self.entrySize
+        return (bytes[offset], bytes[offset + 1], bytes[offset + 2])
+    }
+
+    /// The complete report to send after changing the code byte of one entry (checksum recomputed).
+    public func settingCode(_ code: UInt8, forEntry index: Int) throws -> [UInt8] {
+        guard (0..<Self.entryCount).contains(index) else { throw ProtocolError.invalidButtonEntry(index) }
+        var report = bytes
+        report[Self.firstEntryOffset + index * Self.entrySize] = code
+        let checksum = ProtocolHelper.checksum(data: Array(report[Self.firstEntryOffset..<Self.checksumOffset]))
+        report[Self.checksumOffset] = checksum[0]
+        report[Self.checksumOffset + 1] = checksum[1]
+        return report
+    }
+
+    /// Like `settingCode`, for several entries at once (checksum recomputed once).
+    public func settingCodes(_ codes: [Int: UInt8]) throws -> [UInt8] {
+        var report = bytes
+        for (index, code) in codes {
+            guard (0..<Self.entryCount).contains(index) else { throw ProtocolError.invalidButtonEntry(index) }
+            report[Self.firstEntryOffset + index * Self.entrySize] = code
+        }
+        let checksum = ProtocolHelper.checksum(data: Array(report[Self.firstEntryOffset..<Self.checksumOffset]))
+        report[Self.checksumOffset] = checksum[0]
+        report[Self.checksumOffset + 1] = checksum[1]
+        return report
+    }
+
+    /// 16 bytes per line, each line starting with the offset of its first byte.
+    public var hexDump: String {
+        stride(from: 0, to: bytes.count, by: 16).map { start in
+            let chunk = bytes[start..<min(start + 16, bytes.count)]
+            return String(format: "%02d: ", start) + chunk.map { String(format: "%02X", $0) }.joined(separator: " ")
+        }.joined(separator: "\n")
+    }
+}
+
 /// What the Performance tab edits.
 public nonisolated struct PerformanceSettings: Equatable, Sendable {
     public var pollingRate: Int

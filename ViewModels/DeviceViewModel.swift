@@ -161,6 +161,9 @@ public final class DeviceViewModel: ObservableObject {
             self.mouseDPIConfiguration = nil
             self.mousePerformance = nil
             self.performanceSyncState = .noMouse
+            self.buttonsTask?.cancel()
+            self.buttonsReport = nil
+            self.buttonsSyncState = .noMouse
             self.dpiSyncState = .noMouse
         }
 
@@ -197,7 +200,6 @@ public final class DeviceViewModel: ObservableObject {
             return
         }
 
-        print("📥 input:", raw.map { String(format: "%02x", $0) }.joined(separator: " "))
         guard b.count >= 5, b[1] == 0x55, b[2] == ProtocolConstants.evBattery else { return }
 
         let state = b[3]
@@ -257,6 +259,7 @@ public final class DeviceViewModel: ObservableObject {
         guard isConnected, !endpoints.isEmpty else { return }
         dpiSyncState = .searching
         performanceSyncState = .searching
+        buttonsSyncState = .searching
 
         let transports = probeCandidates().map { DeviceTransport(hidDevice: $0) }
         let found = await onHIDQueue { () -> (Int, DPIConfiguration)? in
@@ -277,14 +280,17 @@ public final class DeviceViewModel: ObservableObject {
             mouseDPIConfiguration = configuration
             dpiSyncState = .synced
             refreshPerformance()
+            refreshButtons()
         } else if attempt < 5 {
             // Wireless mice sleep after a while: keep trying, a mouse movement wakes it up.
             dpiSyncState = .failed("Mouse isn't answering — move it to wake it up")
             performanceSyncState = dpiSyncState
+            buttonsSyncState = dpiSyncState
             scheduleProbe(after: 3, attempt: attempt + 1)
         } else {
             dpiSyncState = .failed("Couldn't read the DPI settings — press ↻ to retry")
             performanceSyncState = .failed("Couldn't read the settings — press ↻ to retry")
+            buttonsSyncState = .failed("Couldn't read the settings — press ↻ to retry")
         }
     }
 
@@ -430,11 +436,171 @@ public final class DeviceViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Buttons report (report 0x08)
+
+    /// Last Buttons report read from the mouse.
+    @Published public private(set) var buttonsReport: ButtonsReport?
+    /// State of the Buttons <-> mouse synchronisation, shown in the Buttons tab.
+    @Published public private(set) var buttonsSyncState: DPISyncState = .noMouse
+    private var buttonsTask: Task<Void, Never>?
+    /// First Buttons report read in this session. "Restore" writes exactly this back.
+    private var buttonsOriginal: ButtonsReport?
+
+    /// Reads the Buttons report (0x08) from the mouse. Read only: nothing is written.
+    public func readButtonsReport(completion: @escaping (ButtonsReport?) -> Void) {
+        guard isConnected, let transport = configTransport else {
+            completion(nil)
+            return
+        }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let report = await self.onHIDQueue { () -> ButtonsReport? in
+                if let first = transport.readButtonsReport() { return first }
+                usleep(150_000)   // a sleeping wireless mouse often answers the second try
+                return transport.readButtonsReport()
+            }
+            if let report {
+                if self.buttonsOriginal == nil { self.buttonsOriginal = report }
+                self.buttonsReport = report
+                print("🧩 Buttons report 0x08:\n\(report.hexDump)")
+            }
+            completion(report)
+        }
+    }
+
+    /// Reads the Buttons report and publishes it. `userInitiated` is the ↻ button: it shows "Reading from mouse…"
+    /// and retries once if the mouse is slow. `completion` receives what was read, or nil.
+    public func refreshButtons(userInitiated: Bool = false, completion: ((ButtonsReport?) -> Void)? = nil) {
+        guard isConnected, let transport = configTransport else {
+            completion?(nil)
+            return
+        }
+        guard buttonsSyncState != .writing else {
+            completion?(nil)
+            return
+        }
+
+        buttonsTask?.cancel()
+        if userInitiated {
+            buttonsSyncState = .reading
+        } else if buttonsReport == nil {
+            buttonsSyncState = .searching
+        }
+
+        buttonsTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let started = Date()
+            let report = await self.onHIDQueue { () -> ButtonsReport? in
+                if let first = transport.readButtonsReport() { return first }
+                guard userInitiated else { return nil }
+                usleep(150_000)
+                return transport.readButtonsReport()
+            }
+            if userInitiated {
+                let elapsed = Date().timeIntervalSince(started)
+                if elapsed < 0.45 { try? await Task.sleep(for: .seconds(0.45 - elapsed)) }
+            }
+            guard !Task.isCancelled, self.configTransport === transport else {
+                completion?(nil)
+                return
+            }
+            if let report {
+                if self.buttonsOriginal == nil { self.buttonsOriginal = report }
+                self.buttonsReport = report
+                self.buttonsSyncState = .synced
+            } else {
+                self.buttonsSyncState = .failed("Mouse isn't answering — move it to wake it up")
+            }
+            completion?(report)
+        }
+    }
+
+    /// Sends new codes for some entries of the Buttons report (entry index -> code), then reads it back to verify.
+    /// `completion` gets (the read-back or nil, whether the report was actually sent).
+    public func writeButtons(_ codes: [Int: UInt8], completion: @escaping (ButtonsReport?, Bool) -> Void) {
+        guard let transport = configTransport else {
+            buttonsSyncState = isConnected ? .failed("Not synced with the mouse yet — change not sent") : .noMouse
+            completion(nil, false)
+            return
+        }
+
+        buttonsSyncState = .writing
+        buttonsTask?.cancel()
+        buttonsTask = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await self.onHIDQueue { transport.writeButtonCodes(codes) }
+
+            guard self.configTransport === transport else {
+                completion(nil, false)
+                return
+            }
+            switch result {
+            case .failed(let message):
+                self.buttonsSyncState = .failed(message)
+                completion(nil, false)
+            case .written(let readback):
+                if let readback {
+                    self.buttonsReport = readback
+                    let confirmed = codes.allSatisfy { readback.codes[$0.key] == $0.value }
+                    self.buttonsSyncState = confirmed
+                        ? .synced
+                        : .failed("The mouse reported different values than were sent")
+                    completion(readback, true)
+                } else {
+                    self.buttonsSyncState = .unverified
+                    completion(nil, true)
+                }
+            }
+        }
+    }
+
+    /// Changes the code of ONE entry of the Buttons report, then reads the report back.
+    /// `completion` gets the read-back, or an error message.
+    public func writeButtonsEntry(_ index: Int, code: UInt8, completion: @escaping (ButtonsReport?, String?) -> Void) {
+        guard isConnected, let transport = configTransport else {
+            completion(nil, "No mouse connected")
+            return
+        }
+        runButtonsWrite(completion) { transport.writeButtonsEntry(index, code: code) }
+    }
+
+    /// Puts back the factory button layout (the report first observed on a real X11).
+    public func restoreButtonsReport(completion: @escaping (ButtonsReport?, String?) -> Void) {
+        guard isConnected, let transport = configTransport else {
+            completion(nil, "No mouse connected")
+            return
+        }
+        guard let original = (try? ButtonsReport(decoding: ButtonsReport.observedDefaultBytes)) ?? buttonsOriginal else {
+            completion(nil, "Nothing to restore")
+            return
+        }
+        runButtonsWrite(completion) { transport.writeButtonsReport(original) }
+    }
+
+    private func runButtonsWrite(_ completion: @escaping (ButtonsReport?, String?) -> Void,
+                                 _ work: @escaping @Sendable () -> ButtonsWriteResult) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result = await self.onHIDQueue(work)
+            switch result {
+            case .failed(let message):
+                completion(nil, message)
+            case .written(let readback):
+                if let readback {
+                    self.buttonsReport = readback
+                    completion(readback, nil)
+                } else {
+                    completion(nil, "Sent, but the mouse didn't confirm it")
+                }
+            }
+        }
+    }
+
     /// Debounced re-read, triggered by the mouse's own "DPI changed" event.
     private func scheduleDPIRefresh() {
         guard configTransport != nil else { return }
         refreshTask?.cancel()
-        refreshTask = Task { [weak self] in
+        refreshTask = Task { @MainActor [weak self] in
             try? await Task.sleep(for: .milliseconds(200))
             guard !Task.isCancelled else { return }
             self?.refreshDPI()
@@ -473,7 +639,7 @@ public final class DeviceViewModel: ObservableObject {
         refreshTask?.cancel()
         let intended = configuration
 
-        Task { [weak self] in
+        Task { @MainActor [weak self] in
             guard let self else { return }
             let outcome = await self.onHIDQueue { () -> (Bool, DPIConfiguration?) in
                 guard transport.sendFeatureReport(reportID: ProtocolConstants.reportDPI, data: report) else {

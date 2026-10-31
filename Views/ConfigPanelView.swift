@@ -3,6 +3,7 @@
 // UI only for now: everything is bound to `ConfigState`, which the HID backend can read/write later.
 
 import SwiftUI
+import AppKit
 import Combine
 import Foundation
 
@@ -142,8 +143,38 @@ enum ButtonAction: String, CaseIterable, Identifiable {
     case back = "Back"
     case dpiCycle = "DPI cycle"
     case disabled = "Disabled"
+    /// A code the app doesn't know: shown as it is and never overwritten unless the user picks something else.
+    case other = "Other (custom)"
 
     var id: String { rawValue }
+
+    /// What the user can pick (`other` only appears when the mouse already holds an unknown code).
+    static var selectable: [ButtonAction] { allCases.filter { $0 != .other } }
+
+    /// Code stored in report 0x08. Back (0x05) and Forward (0x06) are confirmed on a real X11; the rest follows
+    /// the factory layout of the report (left 0x02, right 0x03, middle 0x04, DPI 0x0D, unassigned 0x01).
+    var code: UInt8? {
+        switch self {
+        case .leftClick: 0x02
+        case .rightClick: 0x03
+        case .middleClick: 0x04
+        case .back: 0x05
+        case .forward: 0x06
+        case .dpiCycle: 0x0D
+        case .disabled: 0x01
+        case .other: nil
+        }
+    }
+
+    init(code: UInt8) {
+        self = Self.selectable.first { $0.code == code } ?? .other
+    }
+}
+
+enum ButtonMap {
+    /// Report 0x08 entry (0-based) of: left, right, middle, forward, back.
+    static let entries = [0, 1, 2, 6, 7]
+    static let factoryActions: [ButtonAction] = [.leftClick, .rightClick, .middleClick, .forward, .back]
 }
 
 enum LightMode: String, CaseIterable, Identifiable {
@@ -204,6 +235,13 @@ final class ConfigState: ObservableObject {
     private var isApplyingPerformance = false
     private var isWritingPerformance = false
     private var isSyncingPerformance = false
+
+    // Buttons sync (same scheme as DPI / Performance)
+    private var buttonsKnown: [UInt8]?          // the 18 codes the mouse is known to hold
+    private var hasPendingButtonEdits = false
+    private var isApplyingButtons = false
+    private var isWritingButtons = false
+    private var isSyncingButtons = false
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -228,6 +266,15 @@ final class ConfigState: ObservableObject {
             .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
             .sink { [weak self] _ in self?.pushPerformanceIfNeeded() }
             .store(in: &cancellables)
+
+        let buttonChanges = $buttonActions.dropFirst()
+        buttonChanges
+            .sink { [weak self] actions in self?.noteButtonEdit(actions) }
+            .store(in: &cancellables)
+        buttonChanges
+            .debounce(for: .milliseconds(400), scheduler: DispatchQueue.main)
+            .sink { [weak self] _ in self?.pushButtonsIfNeeded() }
+            .store(in: &cancellables)
     }
 
     /// Connects the DPI state to the mouse: mouse -> UI updates, UI edits -> mouse writes.
@@ -241,6 +288,10 @@ final class ConfigState: ObservableObject {
         device.$mousePerformance
             .compactMap { $0 }
             .sink { [weak self] settings in self?.applyMousePerformance(settings) }
+            .store(in: &cancellables)
+        device.$buttonsReport
+            .compactMap { $0 }
+            .sink { [weak self] report in self?.applyMouseButtons(report) }
             .store(in: &cancellables)
     }
 
@@ -428,6 +479,91 @@ final class ConfigState: ObservableObject {
         if rippleControl != settings.rippleControl { rippleControl = settings.rippleControl }
     }
 
+    // MARK: Buttons sync
+
+    /// Entry index -> new code, for every button whose action differs from what the mouse holds.
+    private static func pendingChanges(_ actions: [ButtonAction], known: [UInt8]) -> [Int: UInt8] {
+        var changes: [Int: UInt8] = [:]
+        for (slot, entry) in ButtonMap.entries.enumerated() where actions.indices.contains(slot) && known.indices.contains(entry) {
+            guard let code = actions[slot].code, known[entry] != code else { continue }
+            changes[entry] = code
+        }
+        return changes
+    }
+
+    /// Back to the factory layout (sent to the mouse like any other edit).
+    func resetButtonsToFactory() {
+        buttonActions = ButtonMap.factoryActions
+    }
+
+    /// ↻ button on the Buttons page: drops unsent edits and loads what the mouse holds right now.
+    func syncButtonsFromMouse() {
+        guard let device, !isWritingButtons, !isSyncingButtons else { return }
+        hasPendingButtonEdits = false
+        isSyncingButtons = true
+        device.refreshButtons(userInitiated: true) { [weak self] report in
+            guard let self else { return }
+            self.isSyncingButtons = false
+            if let report { self.applyMouseButtons(report) }
+        }
+    }
+
+    private func noteButtonEdit(_ actions: [ButtonAction]) {
+        guard !isApplyingButtons, let known = buttonsKnown else { return }
+        if !Self.pendingChanges(actions, known: known).isEmpty { hasPendingButtonEdits = true }
+    }
+
+    private func pushButtonsIfNeeded() {
+        guard !isApplyingButtons, !isWritingButtons, !isSyncingButtons else { return }
+        guard let device, let known = buttonsKnown else {
+            hasPendingButtonEdits = false
+            return
+        }
+        let changes = Self.pendingChanges(buttonActions, known: known)
+        guard !changes.isEmpty else {
+            hasPendingButtonEdits = false
+            return
+        }
+
+        let sent = buttonActions
+        isWritingButtons = true
+        device.writeButtons(changes) { [weak self] confirmed, wasSent in
+            self?.finishButtonsWrite(sent: sent, changes: changes, confirmed: confirmed, wasSent: wasSent)
+        }
+    }
+
+    private func finishButtonsWrite(sent: [ButtonAction], changes: [Int: UInt8], confirmed: ButtonsReport?, wasSent: Bool) {
+        isWritingButtons = false
+        hasPendingButtonEdits = false
+        if let confirmed {
+            buttonsKnown = confirmed.codes
+        } else if wasSent, var known = buttonsKnown {
+            for (entry, code) in changes { known[entry] = code }
+            buttonsKnown = known
+        }
+
+        if buttonActions != sent {
+            // The user kept editing while the write was in flight: send the newer state too.
+            hasPendingButtonEdits = true
+            pushButtonsIfNeeded()
+        } else if let confirmed {
+            // Show what the mouse really holds (normally identical to what was sent).
+            applyMouseButtons(confirmed)
+        }
+    }
+
+    /// Loads the mouse's button layout into the UI (skipped while the user has unsent edits).
+    private func applyMouseButtons(_ report: ButtonsReport) {
+        guard !hasPendingButtonEdits, !isWritingButtons else { return }
+        let codes = report.codes
+        buttonsKnown = codes
+        isApplyingButtons = true
+        defer { isApplyingButtons = false }
+
+        let actions = ButtonMap.entries.map { ButtonAction(code: codes[$0]) }
+        if buttonActions != actions { buttonActions = actions }
+    }
+
     // MARK: DPI logic
 
     var enabledStageCount: Int { dpiStages.filter(\.isEnabled).count }
@@ -475,6 +611,26 @@ final class ConfigState: ObservableObject {
 }
 
 // MARK: - Shared building blocks
+
+/// Rounded panel background. The blurred drop shadow is only drawn in light mode: it is invisible on the
+/// dark window anyway, and blurring a large shape on every frame is what made window resizing lag.
+struct PanelBackground: View {
+    let isDark: Bool
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: 24, style: .continuous)
+        if isDark {
+            shape
+                .fill(Color.black.opacity(0.4))
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
+        } else {
+            shape
+                .fill(Color.white)
+                .overlay(shape.strokeBorder(Color.primary.opacity(0.06), lineWidth: 1))
+                .shadow(color: Color.black.opacity(0.10), radius: 6, x: 0, y: 3)
+        }
+    }
+}
 
 /// Soft press feedback used by every button in the panel.
 private struct PressableStyle: ButtonStyle {
@@ -769,6 +925,26 @@ private struct DPIStageRow: View {
     }
 }
 
+/// The colour disc itself never changes, so it is rasterised once instead of re-drawing two gradients per frame.
+private struct WheelDisc: View {
+    let radius: CGFloat
+
+    var body: some View {
+        ZStack {
+            Circle().fill(
+                AngularGradient(
+                    gradient: Gradient(colors: (0...12).map { Color(hue: Double($0) / 12, saturation: 1, brightness: 1) }),
+                    center: .center
+                )
+            )
+            Circle().fill(
+                RadialGradient(colors: [.white, .white.opacity(0)], center: .center, startRadius: 0, endRadius: radius)
+            )
+        }
+        .drawingGroup()
+    }
+}
+
 /// Hue/saturation disc. Brightness is a separate slider, and is shown by darkening the disc.
 private struct ColorWheel: View {
     @Binding var color: StageColor
@@ -781,15 +957,7 @@ private struct ColorWheel: View {
         let knobY = radius + CGFloat(sin(color.h * 2 * Double.pi) * color.s) * radius
 
         ZStack {
-            Circle().fill(
-                AngularGradient(
-                    gradient: Gradient(colors: (0...12).map { Color(hue: Double($0) / 12, saturation: 1, brightness: 1) }),
-                    center: .center
-                )
-            )
-            Circle().fill(
-                RadialGradient(colors: [.white, .white.opacity(0)], center: .center, startRadius: 0, endRadius: radius)
-            )
+            WheelDisc(radius: radius)
             Circle().fill(Color.black.opacity(1 - color.b))
             Circle().strokeBorder(Color.primary.opacity(0.15), lineWidth: 0.5)
 
@@ -1033,7 +1201,7 @@ private struct SyncBadge: View {
             }
             .buttonStyle(PressableStyle())
             .disabled(isBusy || state == .noMouse)
-            .help("Sync: read the DPI settings from the mouse now")
+            .help("Sync: read the settings from the mouse now")
         }
         .padding(.leading, 10)
         .padding(.trailing, 6)
@@ -1176,13 +1344,130 @@ private struct PerformancePage: View {
     }
 }
 
+/// Temporary tool for working out what the 18 entries and their codes in report 0x08 mean.
+/// It changes ONE entry at a time and can put the original report back.
+private struct ButtonsExperimentCard: View {
+    @ObservedObject var device: DeviceViewModel
+    @State private var report: ButtonsReport?
+    @State private var status: String?
+    @State private var isBusy = false
+    @State private var entry = 1     // 1...18
+    @State private var code = 1      // 0...16
+
+    private func hex(_ value: Int) -> String { String(format: "0x%02X", value) }
+
+    private func pill(_ title: String, disabled: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .medium))
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Capsule().fill(Color.primary.opacity(0.07)))
+        }
+        .buttonStyle(PressableStyle())
+        .disabled(disabled)
+    }
+
+    var body: some View {
+        SettingCard {
+            Text("Button report 0x08 (experimental)").font(.system(size: 13, weight: .medium))
+            Text("Read the raw report (it is also copied), or change ONE entry to see what it controls. Restore puts the factory buttons back.")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                pill(isBusy ? "Working…" : "Read & copy", disabled: isBusy) { read() }
+                pill("Restore factory", disabled: isBusy) { restore() }
+            }
+
+            if let report {
+                Text(report.hexDump)
+                    .font(.system(size: 11, design: .monospaced))
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Divider()
+
+                HStack(spacing: 16) {
+                    Stepper("Entry \(entry)", value: $entry, in: 1...ButtonsReport.entryCount)
+                    Stepper("Code \(hex(code))", value: $code, in: 0...16)
+                }
+                .font(.system(size: 12))
+
+                pill("Send: entry \(entry) = \(hex(code))", disabled: isBusy) { send() }
+            }
+
+            if let status {
+                Text(status)
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+
+    private func read() {
+        isBusy = true
+        status = nil
+        device.readButtonsReport { result in
+            isBusy = false
+            guard let result else {
+                status = "The mouse didn't answer — move it to wake it up"
+                return
+            }
+            report = result
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(result.hexDump, forType: .string)
+            status = "Report read and copied to the clipboard"
+        }
+    }
+
+    private func send() {
+        isBusy = true
+        status = nil
+        let index = entry - 1
+        let value = UInt8(code)
+        device.writeButtonsEntry(index, code: value) { result, error in
+            isBusy = false
+            guard let result else {
+                status = error ?? "Couldn't send"
+                return
+            }
+            report = result
+            status = result.codes[index] == value
+                ? "Mouse confirmed: entry \(index + 1) = \(hex(Int(value)))"
+                : "The mouse reported a different value than was sent"
+        }
+    }
+
+    private func restore() {
+        isBusy = true
+        status = nil
+        device.restoreButtonsReport { result, error in
+            isBusy = false
+            guard let result else {
+                status = error ?? "Couldn't restore"
+                return
+            }
+            report = result
+            status = "Factory buttons restored"
+        }
+    }
+}
+
 private struct ButtonsPage: View {
     @ObservedObject var state: ConfigState
+    @ObservedObject var device: DeviceViewModel
     private let names = ["Left button", "Right button", "Middle button", "Forward side button", "Back side button"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            SectionHeader(title: "Buttons", subtitle: "Choose what each button does.")
+            HStack(alignment: .top, spacing: 10) {
+                SectionHeader(title: "Buttons", subtitle: "Choose what each button does. Changes are sent to the mouse as you make them.")
+                Spacer(minLength: 8)
+                SyncBadge(state: device.buttonsSyncState) { state.syncButtonsFromMouse() }
+            }
 
             SettingCard {
                 ForEach(0..<names.count, id: \.self) { index in
@@ -1190,7 +1475,7 @@ private struct ButtonsPage: View {
                         Text(names[index]).font(.system(size: 13, weight: .medium))
                         Spacer()
                         Picker("", selection: $state.buttonActions[index]) {
-                            ForEach(ButtonAction.allCases) { action in
+                            ForEach(ButtonAction.selectable + (state.buttonActions[index] == .other ? [ButtonAction.other] : [])) { action in
                                 Text(action.rawValue).tag(action)
                             }
                         }
@@ -1201,6 +1486,30 @@ private struct ButtonsPage: View {
                     if index < names.count - 1 { Divider() }
                 }
             }
+
+            HStack(spacing: 10) {
+                Button {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { state.resetButtonsToFactory() }
+                } label: {
+                    Text("Reset to factory")
+                        .font(.system(size: 12, weight: .medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Capsule().fill(Color.primary.opacity(0.07)))
+                }
+                .buttonStyle(PressableStyle())
+
+                Text("Back and Forward are confirmed on the X11. The other actions follow its factory layout, so check them in Live Test.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+
+            DisclosureGroup("Advanced: raw report") {
+                ButtonsExperimentCard(device: device)
+                    .padding(.top, 8)
+            }
+            .font(.system(size: 12))
         }
     }
 }
@@ -1294,33 +1603,22 @@ struct ConfigPanelView: View {
             }
             .scrollIndicators(.hidden)
 
-            // All pages stay alive and slide relative to the selected one, so the direction is always right
-            // and each page keeps its own state when you switch away and back.
-            GeometryReader { geo in
-                ZStack(alignment: .topLeading) {
-                    ForEach(ConfigTab.allCases) { tab in
-                        ScrollView {
-                            page(for: tab)
-                                .padding(.bottom, 8)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        .scrollIndicators(.hidden)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .offset(x: CGFloat(tab.rawValue - selected.rawValue) * geo.size.width * 0.45)
-                        .opacity(tab == selected ? 1 : 0)
-                        .allowsHitTesting(tab == selected)
-                    }
+            // Only the selected page is built. Keeping all five alive meant every hidden page was laid out
+            // again on each frame of a window resize.
+            ZStack(alignment: .topLeading) {
+                ScrollView {
+                    page(for: selected)
+                        .padding(.bottom, 8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .clipped()
+                .scrollIndicators(.hidden)
+                .id(selected)
+                .transition(.opacity)
             }
         }
         .padding(22)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(
-            RoundedRectangle(cornerRadius: 24)
-                .fill(isDark ? Color.black.opacity(0.4) : Color.white)
-                .shadow(color: Color.black.opacity(0.15), radius: 15, x: 0, y: 5)
-        )
+        .background(PanelBackground(isDark: isDark))
         .animation(.spring(response: 0.45, dampingFraction: 0.86), value: selected)
         .onAppear { state.attach(device) }
     }
@@ -1330,7 +1628,7 @@ struct ConfigPanelView: View {
         switch tab {
         case .dpi: DPIPage(state: state, device: device)
         case .performance: PerformancePage(state: state, device: device)
-        case .buttons: ButtonsPage(state: state)
+        case .buttons: ButtonsPage(state: state, device: device)
         case .lighting: LightingPage(state: state)
         case .power: PowerPage(state: state)
         }
