@@ -1,0 +1,112 @@
+name: Draft release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version tag to create, for example v1.0.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build-dmg-and-draft-release:
+    name: Build unsigned DMG and create draft release
+    runs-on: macos-latest
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out repository with full history and tags
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version and make sure the tag is new
+        run: |
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[A-Za-z0-9.]+)?$ ]]; then
+            echo "Version must look like v1.2.3 or v1.2.3-beta.1"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "Tag $VERSION already exists"
+            exit 1
+          fi
+
+      - name: Build unsigned Release app
+        run: |
+          xcodebuild build \
+            -project SharkControl.xcodeproj \
+            -target MyApp \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Package app into DMG
+        run: |
+          APP="build/Build/Products/Release/MyApp.app"
+          if [ ! -d "$APP" ]; then
+            echo "Built app not found at $APP"
+            exit 1
+          fi
+          STAGING="dmg-staging"
+          DMG="SharkControl-${VERSION}-unsigned.dmg"
+          rm -rf "$STAGING" "$DMG"
+          mkdir -p "$STAGING"
+          cp -R "$APP" "$STAGING/"
+          ln -s /Applications "$STAGING/Applications"
+          hdiutil create \
+            -volname "SharkControl ${VERSION}" \
+            -srcfolder "$STAGING" \
+            -ov \
+            -format UDZO \
+            "$DMG"
+
+      - name: Upload DMG as workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SharkControl-${{ env.VERSION }}-unsigned-dmg
+          path: SharkControl-${{ env.VERSION }}-unsigned.dmg
+
+      - name: Generate release notes from commits since last release
+        run: |
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -n "$PREV_TAG" ]; then
+            RANGE="${PREV_TAG}..HEAD"
+            HEADING="Changes since ${PREV_TAG}"
+          else
+            RANGE="HEAD"
+            HEADING="Changes (first release)"
+          fi
+
+          {
+            echo "## ${HEADING}"
+            echo
+            COMMITS=$(git log --no-merges --pretty=format:'- %s (%h)' "$RANGE")
+            if [ -n "$COMMITS" ]; then
+              echo "$COMMITS"
+            else
+              echo "- No commits since the previous release."
+            fi
+            echo
+            echo "## Installation"
+            echo
+            echo "This build is not signed or notarized. On first launch, right-click MyApp and choose Open, or run:"
+            echo
+            echo '    xattr -dr com.apple.quarantine /Applications/MyApp.app'
+          } | python3 .github/scripts/strip_emoji.py > release-notes.md
+
+          cat release-notes.md
+
+      - name: Create draft release with the DMG
+        run: |
+          gh release create "$VERSION" \
+            "SharkControl-${VERSION}-unsigned.dmg" \
+            --draft \
+            --target "$GITHUB_SHA" \
+            --title "SharkControl ${VERSION}" \
+            --notes-file release-notes.md
