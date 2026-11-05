@@ -1,4 +1,4 @@
-# X11 Software
+<img width="1500" height="975" alt="image" src="https://github.com/user-attachments/assets/16c1f464-e234-4bc2-8dd3-3c3f54c4e37c" /># X11 Software
 
 A native macOS app for configuring the ATTACK SHARK X11 mouse. Built with SwiftUI for Apple Silicon and Intel Macs, it talks to the mouse directly over USB HID, with no background services and no third-party dependencies.
 
@@ -85,6 +85,13 @@ For how the DPI report maps to the codec, see `PORTING_NOTES.md`.
 ## Contributing
 
 Issues and pull requests are welcome. Please run `swift test` and make sure the app target compiles before opening a pull request.
+
+## Photos
+<img width="1051" height="700" alt="image" src="https://github.com/user-attachments/assets/fa738d72-187c-4475-b234-9ab265f2c681" />
+<img width="1064" height="701" alt="image" src="https://github.com/user-attachments/assets/b87db1e1-5b44-4388-91a4-ad40b46b3514" />
+<img width="1058" height="702" alt="image" src="https://github.com/user-attachments/assets/7048305b-6e06-4eb6-9c71-964bd80cfbf1" />
+<img width="1059" height="705" alt="image" src="https://github.com/user-attachments/assets/b149d9e8-33c0-4955-9689-56d3d6e2a7c4" />
+<img width="1063" height="704" alt="image" src="https://github.com/user-attachments/assets/9d6a7a82-ba78-4549-8fcd-ec95e398d9ff" />
 
 ## License
 
