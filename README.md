@@ -1,4 +1,4 @@
-<img width="1500" height="975" alt="image" src="https://github.com/user-attachments/assets/16c1f464-e234-4bc2-8dd3-3c3f54c4e37c" /># X11 Software
+X11 Software
 
 A native macOS app for configuring the ATTACK SHARK X11 mouse. Built with SwiftUI for Apple Silicon and Intel Macs, it talks to the mouse directly over USB HID, with no background services and no third-party dependencies.
 
